@@ -1,0 +1,8 @@
+Local Text Archives
+
+This plain text file shows how Text Jellyfin turns .txt sources into readable articles.
+
+Paragraphs are preserved.
+Line breaks inside a paragraph stay visible.
+
+Tags and summaries for plain text usually come from a sidecar YAML file.

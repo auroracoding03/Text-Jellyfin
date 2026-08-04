@@ -1,0 +1,15 @@
+services:
+  text-jellyfin:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      LIBRARY_PATH: /library
+      DATA_PATH: /data
+    volumes:
+      - ./fixtures/library:/library
+      - textjellyfin-data:/data
+    restart: unless-stopped
+
+volumes:
+  textjellyfin-data:
