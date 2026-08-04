@@ -102,6 +102,27 @@ button.button:hover {
   border-color: var(--brand);
 }
 
+.button:disabled,
+button.button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+  transform: none;
+}
+
+.desktop-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.desktop-toggle input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--brand);
+}
+
 .nav a:focus-visible,
 .button:focus-visible,
 button.button:focus-visible,

@@ -14,6 +14,7 @@ Point it at a folder of `.md`, `.txt`, `.docx`, and `.pdf` files. Text Jellyfin 
 - SQLite + FTS5 full-text search
 - Optional full-app login and phone uploads for Markdown, text files, and pasted notes
 - Docker-friendly self-hosting
+- Windows desktop installer with startup and in-app update support
 
 ## Quick start
 
@@ -98,6 +99,46 @@ npm run build     # production build
 npm run start     # run production server
 npm test          # unit / adapter tests
 ```
+
+## Windows desktop app
+
+The desktop build packages the local server with the app, so the target PC does
+not need Node.js, Docker, or a separate service. On first run it creates a
+`Text Jellyfin Library` folder in the signed-in user's Documents folder and
+stores the database under the app's Windows user-data directory. You can point
+it at another library by setting `LIBRARY_PATH` before starting the app.
+
+Build the 64-bit Windows installer from a clean checkout on a Windows x64
+machine (or a Windows CI runner). The SQLite driver is native code, so this
+must not be cross-compiled from macOS:
+
+```bash
+npm install
+npm run build:desktop
+```
+
+The resulting `dist/Text Jellyfin Setup <version>.exe` is the one-click
+per-user installer. It adds a Start Menu and Desktop shortcut, uses the ink
+quill icon, and starts the application after installation. The Settings page
+lets each user enable or disable launch at Windows sign-in.
+
+### Release updates
+
+The desktop app uses GitHub Releases as its update feed. Publish a Windows
+release with a GitHub token that has `contents: write` permission:
+
+```bash
+set GH_TOKEN=your_github_token
+npm run build:desktop:publish
+```
+
+This creates a GitHub release containing the installer and update metadata.
+The installed app checks it at startup and from Settings. When it finds a newer
+release, the user can download it, then choose **Restart & install update**.
+This shuts down the bundled localhost server, applies the installer, and
+launches the new server version automatically. Increment the `version` in
+`package.json` for each release. Code-sign the installer before public
+distribution to avoid Windows SmartScreen warnings.
 
 ## Docker
 

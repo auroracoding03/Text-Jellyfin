@@ -1,7 +1,12 @@
 {
   "name": "text-jellyfin",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
+  "main": "desktop/main.cjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/auroracoding03/Text-Jellyfin.git"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,13 +15,52 @@
     "scan": "tsx scripts/scan.ts",
     "fixtures": "tsx scripts/generate-fixtures.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "desktop": "electron .",
+    "desktop:dev": "electron .",
+    "prepare:desktop": "node scripts/prepare-desktop.mjs",
+    "build:desktop": "npm run build && npm run prepare:desktop && electron-builder --win nsis --x64 --publish never",
+    "build:desktop:publish": "npm run build && npm run prepare:desktop && electron-builder --win nsis --x64 --publish always"
   },
   "engines": {
     "node": ">=20 <26"
   },
+  "build": {
+    "appId": "com.textjellyfin.app",
+    "productName": "Text Jellyfin",
+    "asar": false,
+    "files": [
+      "desktop/**/*",
+      "assets/icons/icon.ico",
+      ".next/standalone/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icons/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "auroracoding03",
+        "repo": "Text-Jellyfin",
+        "releaseType": "release"
+      }
+    ]
+  },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
+    "electron-updater": "^6.8.9",
     "gray-matter": "^4.0.3",
     "mammoth": "^1.12.0",
     "next": "14.2.35",
@@ -39,6 +83,8 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/sanitize-html": "^2.16.1",
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "jszip": "^3.10.1",

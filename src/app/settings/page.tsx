@@ -1,4 +1,5 @@
 import { RescanButton } from "@/components/RescanButton";
+import { DesktopAppControls } from "@/components/DesktopAppControls";
 import { config } from "@/lib/config";
 import { getLatestScanRun, getLibraryStats } from "@/lib/catalog/queries";
 
@@ -73,6 +74,8 @@ export default function SettingsPage() {
               : "Disabled — set AUTH_USERNAME and AUTH_PASSWORD in the server environment to enable authenticated uploads."}
           </p>
         </div>
+
+        <DesktopAppControls />
       </div>
     </main>
   );
