@@ -12,6 +12,7 @@ Point it at a folder of `.md`, `.txt`, `.docx`, and `.pdf` files. Text Jellyfin 
 - Cached, sanitized HTML article reader
 - Original-file download fallback
 - SQLite + FTS5 full-text search
+- Optional full-app login and phone uploads for Markdown, text files, and pasted notes
 - Docker-friendly self-hosting
 
 ## Quick start
@@ -36,7 +37,35 @@ By default the library path is `fixtures/library` and app data lives in `data/`.
 | `LIBRARY_PATH` | Folder of source documents | `./fixtures/library` |
 | `DATA_PATH` | SQLite DB + generated article cache | `./data` |
 | `MAX_FILE_BYTES` | Per-file size limit | `41943040` (40 MB) |
+| `MAX_UPLOAD_BYTES` | Per-upload limit for phone uploads | `5242880` (5 MB) |
+| `AUTH_USERNAME` | Enables full-app Basic Authentication with `AUTH_PASSWORD` | Disabled |
+| `AUTH_PASSWORD` | Password for the full-app Basic Authentication login | Disabled |
 | `ADAPTER_TIMEOUT_MS` | Per-document extraction timeout | `60000` |
+
+## Phone uploads
+
+Set both `AUTH_USERNAME` and `AUTH_PASSWORD` in the server environment, then
+restart the app. Your browser will prompt for the credentials before it can
+read the library or upload. Once authenticated, open the **Upload** page from
+your phone. Uploaded `.md`, `.markdown`, and `.txt` files are saved under
+`uploads/` inside your library. You can also paste text and choose whether to
+save it as Markdown or plain text.
+
+On a trusted home network, open `http://SERVER_IP:3000/upload` from your
+phone. Keep port 3000 private to that network—do not port-forward it to the
+internet. The library volume must remain writable for uploads to work.
+
+For a Docker deployment, add the credentials to a `.env` file next to
+`compose.yaml`:
+
+```bash
+AUTH_USERNAME=reader
+AUTH_PASSWORD=use-a-strong-unique-password
+```
+
+Basic Authentication keeps the experience simple on a private network, but
+HTTP does not encrypt its password. Use HTTPS when the network is not fully
+trusted, and do not expose the app directly to the public internet.
 
 ## Metadata
 

@@ -17,7 +17,16 @@ export const config = {
   get cachePath() {
     return path.join(this.dataPath, "cache");
   },
+  get uploadsPath() {
+    return path.join(this.libraryPath, "uploads");
+  },
   maxFileBytes: Number(process.env.MAX_FILE_BYTES || 40 * 1024 * 1024),
+  maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES || 5 * 1024 * 1024),
+  authUsername: process.env.AUTH_USERNAME?.trim() || "",
+  authPassword: process.env.AUTH_PASSWORD || "",
+  get authEnabled() {
+    return Boolean(this.authUsername && this.authPassword);
+  },
   adapterTimeoutMs: Number(process.env.ADAPTER_TIMEOUT_MS || 60_000),
   wordsPerMinute: 220,
 };

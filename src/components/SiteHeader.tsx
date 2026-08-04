@@ -8,6 +8,7 @@ export function SiteHeader() {
       </Link>
       <nav className="nav">
         <Link href="/">Library</Link>
+        <Link href="/upload">Upload</Link>
         <Link href="/settings">Settings</Link>
       </nav>
     </header>

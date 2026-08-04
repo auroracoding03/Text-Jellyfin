@@ -1,0 +1,99 @@
+import fs from "node:fs";
+import path from "node:path";
+import { config } from "@/lib/config";
+import { getDocumentByPath } from "@/lib/catalog/queries";
+import { scanLibrary } from "@/lib/ingest/scanner";
+import { assertWithinRoot, ensureDir, toPosixRelative } from "@/lib/security/paths";
+
+export type UploadFormat = "md" | "txt";
+
+export class UploadError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number = 400,
+  ) {
+    super(message);
+  }
+}
+
+function normalizeFormat(value: string): UploadFormat {
+  if (value === "md" || value === "markdown") return "md";
+  if (value === "txt" || value === "text") return "txt";
+  throw new UploadError("Only Markdown and plain-text uploads are supported.");
+}
+
+function safeStem(value: string): string {
+  const stem = value
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9 _-]/g, "-")
+    .replace(/\s+/g, " ")
+    .replace(/[- ]{2,}/g, "-")
+    .replace(/^[-. ]+|[-. ]+$/g, "")
+    .slice(0, 100);
+  return stem || "untitled";
+}
+
+function writeUpload(stem: string, format: UploadFormat, content: Buffer): string {
+  if (!content.length) throw new UploadError("Upload content cannot be empty.");
+  if (content.length > config.maxUploadBytes) {
+    throw new UploadError(
+      `Upload exceeds the ${config.maxUploadBytes} byte upload limit.`,
+      413,
+    );
+  }
+
+  ensureDir(config.uploadsPath);
+  const directory = assertWithinRoot(config.libraryPath, config.uploadsPath);
+  const extension = format === "md" ? ".md" : ".txt";
+  const base = safeStem(stem);
+
+  for (let index = 0; index < 100; index += 1) {
+    const suffix = index ? `-${index + 1}` : "";
+    const filename = `${base}${suffix}${extension}`;
+    const candidate = assertWithinRoot(directory, path.join(directory, filename));
+    try {
+      fs.writeFileSync(candidate, content, { flag: "wx" });
+      return candidate;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") continue;
+      throw error;
+    }
+  }
+
+  throw new UploadError("Could not create a unique filename for this upload.", 409);
+}
+
+async function indexUpload(absolutePath: string) {
+  const relativePath = toPosixRelative(config.libraryPath, absolutePath);
+  const scan = await scanLibrary();
+  const document = getDocumentByPath(relativePath);
+  return {
+    relativePath,
+    documentId: document?.id || null,
+    scan,
+  };
+}
+
+export async function uploadText(input: {
+  title: string;
+  format: string;
+  text: string;
+}) {
+  const format = normalizeFormat(input.format);
+  const title = input.title.trim();
+  if (!title) throw new UploadError("A title is required for pasted text.");
+  const absolutePath = writeUpload(title, format, Buffer.from(input.text, "utf8"));
+  return indexUpload(absolutePath);
+}
+
+export async function uploadFile(input: {
+  filename: string;
+  content: Buffer;
+  title?: string;
+}) {
+  const extension = path.extname(input.filename).toLowerCase();
+  const format = normalizeFormat(extension.slice(1));
+  const stem = input.title?.trim() || path.basename(input.filename, extension);
+  const absolutePath = writeUpload(stem, format, input.content);
+  return indexUpload(absolutePath);
+}
