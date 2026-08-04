@@ -37,8 +37,9 @@ export const config = {
   authIsDefault:
     auth.username === DEFAULT_AUTH_USERNAME &&
     auth.password === DEFAULT_AUTH_PASSWORD,
+  desktopMode: process.env.TEXT_JELLYFIN_DESKTOP === "1",
   get authEnabled() {
-    return Boolean(this.authUsername && this.authPassword);
+    return !this.desktopMode && Boolean(this.authUsername && this.authPassword);
   },
   adapterTimeoutMs: Number(process.env.ADAPTER_TIMEOUT_MS || 60_000),
   wordsPerMinute: 220,

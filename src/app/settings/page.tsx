@@ -70,11 +70,15 @@ export default function SettingsPage() {
         <div className="panel">
           <h2>Login</h2>
           <p style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
-            Basic Authentication is always on. Default credentials are{" "}
-            <code>admin</code> / <code>admin</code>
-            {config.authIsDefault
-              ? " — change AUTH_USERNAME and AUTH_PASSWORD in the server environment when you can."
-              : " — this server is using custom AUTH_USERNAME / AUTH_PASSWORD values."}
+            {config.desktopMode
+              ? "Desktop mode is local-only, so the login prompt is skipped here. Network/Docker installs still use Basic Auth (default admin / admin)."
+              : <>
+                  Basic Authentication is always on. Default credentials are{" "}
+                  <code>admin</code> / <code>admin</code>
+                  {config.authIsDefault
+                    ? " — change AUTH_USERNAME and AUTH_PASSWORD in the server environment when you can."
+                    : " — this server is using custom AUTH_USERNAME / AUTH_PASSWORD values."}
+                </>}
           </p>
         </div>
 

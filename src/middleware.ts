@@ -13,6 +13,12 @@ function challenge(): NextResponse {
 }
 
 export function middleware(request: NextRequest) {
+  // The Windows desktop shell only binds localhost; skip Basic Auth there so
+  // Electron is not stuck on the raw 401 body without a credential dialog.
+  if (process.env.TEXT_JELLYFIN_DESKTOP === "1") {
+    return NextResponse.next();
+  }
+
   const { username, password } = resolveAuthCredentials(
     process.env.AUTH_USERNAME,
     process.env.AUTH_PASSWORD,

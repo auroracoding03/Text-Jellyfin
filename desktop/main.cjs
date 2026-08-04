@@ -188,14 +188,13 @@ async function startLocalServer() {
 
   const environment = {
     ...process.env,
-    AUTH_PASSWORD: process.env.AUTH_PASSWORD || "admin",
-    AUTH_USERNAME: process.env.AUTH_USERNAME || "admin",
     DATA_PATH: dataPath,
     ELECTRON_RUN_AS_NODE: "1",
     HOSTNAME: "127.0.0.1",
     LIBRARY_PATH: libraryPath,
     NODE_ENV: app.isPackaged ? "production" : "development",
     PORT: String(serverPort),
+    TEXT_JELLYFIN_DESKTOP: "1",
   };
 
   const entrypoint = app.isPackaged
