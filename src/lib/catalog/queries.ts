@@ -170,7 +170,7 @@ export function listDocuments(filters: DocumentFilters = {}): DocumentRecord[] {
     SELECT d.*
     FROM documents d
     WHERE ${where.join(" AND ")}
-    ORDER BY d.title COLLATE NOCASE
+    ORDER BY d.indexed_at DESC, d.title COLLATE NOCASE
   `;
   return attachTags(db, db.prepare(sql).all(...params) as DocumentRow[]);
 }

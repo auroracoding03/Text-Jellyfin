@@ -164,36 +164,70 @@ textarea:focus-visible {
   color: var(--ink);
 }
 
-.library-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
-}
-
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  min-height: 220px;
-  padding: 1.1rem;
-  background: var(--card);
+.library-feed {
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 1.1rem;
+  background: rgba(33, 31, 26, 0.78);
   box-shadow: var(--shadow);
 }
 
-.card h2 {
+.feed-item {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  transition: background 120ms ease;
+}
+
+.feed-item + .feed-item {
+  border-top: 1px solid var(--line);
+}
+
+.feed-item:hover {
+  background: rgba(131, 182, 155, 0.08);
+}
+
+.feed-icon {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--bg-accent);
+  color: var(--brand);
+  font-family: var(--serif);
+  font-size: 1.45rem;
+}
+
+.feed-copy {
+  min-width: 0;
+}
+
+.feed-copy h2 {
   margin: 0;
   font-family: var(--serif);
   font-size: 1.35rem;
   line-height: 1.2;
 }
 
-.card p {
-  margin: 0;
+.feed-copy p {
+  overflow: hidden;
+  margin: 0.3rem 0 0;
   color: var(--muted);
   line-height: 1.5;
-  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-meta {
+  display: grid;
+  justify-items: end;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .meta-row,
@@ -202,6 +236,34 @@ textarea:focus-visible {
   flex-wrap: wrap;
   gap: 0.4rem;
   align-items: center;
+}
+
+.tag-editor {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.tag-editor label {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.tag-editor-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.tag-editor-controls input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.tag-edit-button {
+  justify-self: start;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.86rem;
 }
 
 .chip,
@@ -360,6 +422,37 @@ textarea:focus-visible {
   gap: 1rem;
 }
 
+.upload-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.upload-panel-intro {
+  margin: 0;
+  color: var(--muted);
+}
+
+.record-editor-section {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 2rem;
+}
+
+.record-editor-section h2,
+.record-editor-section p {
+  margin: 0;
+}
+
+.record-editor-section > p {
+  color: var(--muted);
+}
+
+.content-editor textarea {
+  min-height: 24rem;
+  font-family: var(--mono);
+  line-height: 1.55;
+}
+
 .field {
   display: grid;
   gap: 0.4rem;
@@ -429,5 +522,23 @@ textarea:focus-visible {
   .site-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .feed-item {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .feed-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .feed-meta {
+    grid-column: 2;
+    justify-items: start;
+    grid-auto-flow: column;
+    justify-content: start;
+    align-items: center;
   }
 }
