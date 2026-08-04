@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type UploadMode = "file" | "text";
 
@@ -11,7 +11,11 @@ type UploadResponse = {
   relativePath?: string;
 };
 
+/** Keep accept loose — iOS Safari often fails to open the picker with .md-only filters. */
+const FILE_ACCEPT = "text/plain,text/markdown,text/*,.txt,.md,.markdown,.text";
+
 export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<UploadMode>("file");
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
@@ -22,6 +26,20 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<UploadResponse | null>(null);
+
+  function chooseFile() {
+    setError(null);
+    fileInputRef.current?.click();
+  }
+
+  function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const next = event.target.files?.[0] || null;
+    setFile(next);
+    setError(null);
+    setSuccess(null);
+    // Allow selecting the same file again on iOS.
+    event.target.value = "";
+  }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,7 +60,7 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
     body.set("title", title);
     body.set("summary", summary);
     body.set("tags", tags);
-    if (mode === "file" && file) body.set("file", file);
+    if (mode === "file" && file) body.set("file", file, file.name);
     if (mode === "text") {
       body.set("format", format);
       body.set("text", text);
@@ -53,6 +71,7 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
       const response = await fetch("/api/uploads", {
         method: "POST",
         body,
+        credentials: "same-origin",
       });
       const payload = (await response.json()) as UploadResponse;
       if (!response.ok) throw new Error(payload.error || "Upload failed.");
@@ -131,14 +150,29 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
 
       {mode === "file" ? (
         <div id="upload-file-panel" className="field upload-panel" role="tabpanel">
-          <label htmlFor="upload-file">Markdown or text file</label>
+          <span className="field-label">Markdown or text file</span>
           <input
+            ref={fileInputRef}
             id="upload-file"
+            className="upload-file-input"
             type="file"
-            accept=".md,.markdown,.txt,text/plain,text/markdown"
-            onChange={(event) => setFile(event.target.files?.[0] || null)}
+            accept={FILE_ACCEPT}
+            capture={undefined}
+            onChange={onFileChange}
           />
-          <small>Files are limited to {formatBytes(maxUploadBytes)}.</small>
+          <button className="button" type="button" onClick={chooseFile}>
+            {file ? "Choose a different file" : "Choose file"}
+          </button>
+          {file ? (
+            <p className="upload-file-chosen">
+              Selected: <code>{file.name}</code> ({formatBytes(file.size)})
+            </p>
+          ) : (
+            <small>
+              On iPhone, pick from Files. Use a <code>.txt</code> or <code>.md</code> file
+              (or paste text instead). Limit {formatBytes(maxUploadBytes)}.
+            </small>
+          )}
         </div>
       ) : (
         <div id="paste-text-panel" className="upload-panel" role="tabpanel">
@@ -191,6 +225,7 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
 }
 
 function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

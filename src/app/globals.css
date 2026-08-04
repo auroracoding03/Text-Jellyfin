@@ -489,9 +489,28 @@ textarea:focus-visible {
   gap: 0.4rem;
 }
 
-.field label {
+.field label,
+.field-label {
   font-size: 0.9rem;
   color: var(--muted);
+}
+
+.upload-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.upload-file-chosen {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.45;
 }
 
 .field small {

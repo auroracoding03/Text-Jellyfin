@@ -18,8 +18,9 @@ export class UploadError extends Error {
 }
 
 function normalizeFormat(value: string): UploadFormat {
-  if (value === "md" || value === "markdown") return "md";
-  if (value === "txt" || value === "text") return "txt";
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "md" || normalized === "markdown") return "md";
+  if (normalized === "txt" || normalized === "text") return "txt";
   throw new UploadError("Only Markdown and plain-text uploads are supported.");
 }
 

@@ -60,14 +60,25 @@ async function uploadFromFile(
   summary: string,
   tags: string[],
 ) {
-  if (!(value instanceof File)) {
+  if (!isUploadFile(value)) {
     throw new UploadError("Choose a Markdown or plain-text file to upload.");
   }
   return uploadFile({
-    filename: value.name,
+    filename: value.name || "upload.txt",
     content: Buffer.from(await value.arrayBuffer()),
     title,
     summary,
     tags,
   });
+}
+
+function isUploadFile(
+  value: FormDataEntryValue | null,
+): value is Blob & { name: string; arrayBuffer: () => Promise<ArrayBuffer> } {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      typeof (value as Blob).arrayBuffer === "function" &&
+      "name" in value,
+  );
 }
