@@ -1,6 +1,6 @@
 {
   "name": "text-jellyfin",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "main": "desktop/main.cjs",
   "repository": {
@@ -23,12 +23,13 @@
     "build:desktop:publish": "npm run build && npm run prepare:desktop && electron-builder --win nsis --x64 --publish always"
   },
   "engines": {
-    "node": ">=20 <26"
+    "node": ">=22 <26"
   },
   "build": {
     "appId": "com.textjellyfin.app",
     "productName": "Text Jellyfin",
     "asar": false,
+    "npmRebuild": false,
     "files": [
       "desktop/**/*",
       "assets/icons/icon.ico",
@@ -59,7 +60,7 @@
     ]
   },
   "dependencies": {
-    "better-sqlite3": "^11.7.0",
+    "better-sqlite3": "^13.0.2",
     "electron-updater": "^6.8.9",
     "gray-matter": "^4.0.3",
     "mammoth": "^1.12.0",
