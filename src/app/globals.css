@@ -370,6 +370,49 @@ textarea:focus-visible {
   color: var(--muted);
 }
 
+.field small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.upload-form {
+  max-width: 44rem;
+}
+
+.upload-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.form-message {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.form-message a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.form-error {
+  color: var(--danger);
+}
+
+.form-success {
+  color: var(--ok);
+}
+
+.upload-notice {
+  max-width: 44rem;
+}
+
+.upload-notice h2 {
+  color: var(--ink);
+  margin-top: 0;
+}
+
 .stats {
   display: flex;
   flex-wrap: wrap;

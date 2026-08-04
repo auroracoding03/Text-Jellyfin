@@ -6,6 +6,9 @@ services:
     environment:
       LIBRARY_PATH: /library
       DATA_PATH: /data
+      AUTH_USERNAME: ${AUTH_USERNAME:-}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-5242880}
     volumes:
       - ./fixtures/library:/library
       - textjellyfin-data:/data
