@@ -11,14 +11,14 @@ export async function PUT(
   try {
     const body = await request.json();
     await updateDocumentMetadata(params.id, {
-      title: String(body.title || ""),
-      summary: String(body.summary || ""),
-      author: String(body.author || ""),
-      series: String(body.series || ""),
-      language: String(body.language || ""),
-      tags: Array.isArray(body.tags)
-        ? body.tags.map((tag: unknown) => String(tag))
-        : [],
+      ...(typeof body.title === "string" ? { title: body.title } : {}),
+      ...(typeof body.summary === "string" ? { summary: body.summary } : {}),
+      ...(typeof body.author === "string" ? { author: body.author } : {}),
+      ...(typeof body.series === "string" ? { series: body.series } : {}),
+      ...(typeof body.language === "string" ? { language: body.language } : {}),
+      ...(Array.isArray(body.tags)
+        ? { tags: body.tags.map((tag: unknown) => String(tag)) }
+        : {}),
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

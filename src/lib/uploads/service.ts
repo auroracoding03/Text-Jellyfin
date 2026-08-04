@@ -3,6 +3,7 @@ import path from "node:path";
 import { config } from "@/lib/config";
 import { getDocumentByPath } from "@/lib/catalog/queries";
 import { scanLibrary } from "@/lib/ingest/scanner";
+import { writeSidecar } from "@/lib/ingest/metadata";
 import { assertWithinRoot, ensureDir, toPosixRelative } from "@/lib/security/paths";
 
 export type UploadFormat = "md" | "txt";
@@ -63,6 +64,25 @@ function writeUpload(stem: string, format: UploadFormat, content: Buffer): strin
   throw new UploadError("Could not create a unique filename for this upload.", 409);
 }
 
+function normalizeSummary(value: string | undefined): string | undefined {
+  const summary = value?.trim();
+  if (!summary) return undefined;
+  if (summary.length > 500) {
+    throw new UploadError("A teaser must be 500 characters or fewer.");
+  }
+  return summary;
+}
+
+function writeUploadMetadata(
+  absolutePath: string,
+  input: { title?: string; summary?: string; tags?: string[] },
+): void {
+  const title = input.title?.trim() || undefined;
+  const summary = normalizeSummary(input.summary);
+  const tags = input.tags?.map((tag) => tag.trim()).filter(Boolean);
+  if (title || summary || tags?.length) writeSidecar(absolutePath, { title, summary, tags });
+}
+
 async function indexUpload(absolutePath: string) {
   const relativePath = toPosixRelative(config.libraryPath, absolutePath);
   const scan = await scanLibrary();
@@ -78,11 +98,14 @@ export async function uploadText(input: {
   title: string;
   format: string;
   text: string;
+  summary?: string;
+  tags?: string[];
 }) {
   const format = normalizeFormat(input.format);
   const title = input.title.trim();
   if (!title) throw new UploadError("A title is required for pasted text.");
   const absolutePath = writeUpload(title, format, Buffer.from(input.text, "utf8"));
+  writeUploadMetadata(absolutePath, { title, summary: input.summary, tags: input.tags });
   return indexUpload(absolutePath);
 }
 
@@ -90,10 +113,17 @@ export async function uploadFile(input: {
   filename: string;
   content: Buffer;
   title?: string;
+  summary?: string;
+  tags?: string[];
 }) {
   const extension = path.extname(input.filename).toLowerCase();
   const format = normalizeFormat(extension.slice(1));
   const stem = input.title?.trim() || path.basename(input.filename, extension);
   const absolutePath = writeUpload(stem, format, input.content);
+  writeUploadMetadata(absolutePath, {
+    title: input.title,
+    summary: input.summary,
+    tags: input.tags,
+  });
   return indexUpload(absolutePath);
 }

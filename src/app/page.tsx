@@ -58,7 +58,7 @@ export default async function HomePage({
           from Settings.
         </div>
       ) : (
-        <div className="library-grid">
+        <div className="library-feed">
           {documents.map((document) => (
             <DocumentCard key={document.id} document={document} />
           ))}

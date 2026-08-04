@@ -27,6 +27,10 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const kind = formData.get("kind");
     const title = String(formData.get("title") || "");
+    const tags = String(formData.get("tags") || "")
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
 
     const result =
       kind === "text"
@@ -34,8 +38,15 @@ export async function POST(request: Request) {
             title,
             format: String(formData.get("format") || "txt"),
             text: String(formData.get("text") || ""),
+            summary: String(formData.get("summary") || ""),
+            tags,
           })
-        : await uploadFromFile(formData.get("file"), title);
+        : await uploadFromFile(
+            formData.get("file"),
+            title,
+            String(formData.get("summary") || ""),
+            tags,
+          );
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
@@ -50,7 +61,12 @@ export async function POST(request: Request) {
   }
 }
 
-async function uploadFromFile(value: FormDataEntryValue | null, title: string) {
+async function uploadFromFile(
+  value: FormDataEntryValue | null,
+  title: string,
+  summary: string,
+  tags: string[],
+) {
   if (!(value instanceof File)) {
     throw new UploadError("Choose a Markdown or plain-text file to upload.");
   }
@@ -58,5 +74,7 @@ async function uploadFromFile(value: FormDataEntryValue | null, title: string) {
     filename: value.name,
     content: Buffer.from(await value.arrayBuffer()),
     title,
+    summary,
+    tags,
   });
 }

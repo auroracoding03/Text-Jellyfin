@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StatusBadge } from "@/components/StatusBadge";
+import { TagEditor } from "@/components/TagEditor";
 import { getDocumentById } from "@/lib/catalog/queries";
 import { readArticleHtml } from "@/lib/ingest/cache";
 
@@ -69,13 +70,7 @@ export default async function WorkPage({
               <dd>{document.indexedAt || "—"}</dd>
             </div>
           </dl>
-          <div className="tag-row" style={{ marginTop: "1rem" }}>
-            {document.tags.map((tag) => (
-              <span key={tag} className="chip">
-                {tag}
-              </span>
-            ))}
-          </div>
+          <TagEditor id={document.id} initialTags={document.tags} />
         </div>
 
         {document.warnings.length ? (
@@ -93,7 +88,7 @@ export default async function WorkPage({
           <h2>Actions</h2>
           <div className="nav" style={{ flexDirection: "column", alignItems: "stretch" }}>
             <Link className="button" href={`/works/${document.id}/edit`}>
-              Edit metadata
+              Edit record
             </Link>
             <a className="button" href={`/api/works/${document.id}/original`}>
               Open original

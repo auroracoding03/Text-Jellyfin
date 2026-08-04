@@ -14,6 +14,8 @@ type UploadResponse = {
 export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
   const [mode, setMode] = useState<UploadMode>("file");
   const [title, setTitle] = useState("");
+  const [summary, setSummary] = useState("");
+  const [tags, setTags] = useState("");
   const [format, setFormat] = useState("md");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -38,6 +40,8 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
     const body = new FormData();
     body.set("kind", mode);
     body.set("title", title);
+    body.set("summary", summary);
+    body.set("tags", tags);
     if (mode === "file" && file) body.set("file", file);
     if (mode === "text") {
       body.set("format", format);
@@ -55,6 +59,8 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
 
       setSuccess(payload);
       setTitle("");
+      setSummary("");
+      setTags("");
       setText("");
       setFile(null);
     } catch (uploadError) {
@@ -66,12 +72,13 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
 
   return (
     <form className="form-grid panel upload-form" onSubmit={onSubmit}>
-      <div className="upload-mode" role="group" aria-label="Upload type">
+      <div className="upload-mode" role="tablist" aria-label="Upload type">
         <button
           className={`button ${mode === "file" ? "button-primary" : ""}`}
           type="button"
           onClick={() => setMode("file")}
           aria-pressed={mode === "file"}
+          aria-controls="upload-file-panel"
         >
           Upload a file
         </button>
@@ -80,6 +87,7 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
           type="button"
           onClick={() => setMode("text")}
           aria-pressed={mode === "text"}
+          aria-controls="paste-text-panel"
         >
           Paste text
         </button>
@@ -98,8 +106,31 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
         />
       </div>
 
+      <div className="field">
+        <label htmlFor="upload-summary">Summary / teaser</label>
+        <textarea
+          id="upload-summary"
+          rows={3}
+          maxLength={500}
+          value={summary}
+          onChange={(event) => setSummary(event.target.value)}
+          placeholder="A short description for the feed"
+        />
+        <small>{summary.length}/500 characters</small>
+      </div>
+
+      <div className="field">
+        <label htmlFor="upload-tags">Tags (comma-separated)</label>
+        <input
+          id="upload-tags"
+          value={tags}
+          onChange={(event) => setTags(event.target.value)}
+          placeholder="notes, reading, personal"
+        />
+      </div>
+
       {mode === "file" ? (
-        <div className="field">
+        <div id="upload-file-panel" className="field upload-panel" role="tabpanel">
           <label htmlFor="upload-file">Markdown or text file</label>
           <input
             id="upload-file"
@@ -110,7 +141,10 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
           <small>Files are limited to {formatBytes(maxUploadBytes)}.</small>
         </div>
       ) : (
-        <>
+        <div id="paste-text-panel" className="upload-panel" role="tabpanel">
+          <p className="upload-panel-intro">
+            Paste or write the full article below. It will be saved directly in your library.
+          </p>
           <div className="field">
             <label htmlFor="upload-format">Save pasted text as</label>
             <select
@@ -123,7 +157,7 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
             </select>
           </div>
           <div className="field">
-            <label htmlFor="upload-text">Text</label>
+            <label htmlFor="upload-text">Article text</label>
             <textarea
               id="upload-text"
               rows={12}
@@ -133,7 +167,7 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
               required
             />
           </div>
-        </>
+        </div>
       )}
 
       {error ? <p className="form-message form-error">{error}</p> : null}

@@ -45,6 +45,8 @@ describe.sequential("upload service", () => {
       title: "Phone note",
       format: "md",
       text: "# A note\n\nSent from my phone.",
+      summary: "A short phone teaser.",
+      tags: ["Phone", "inbox"],
     });
 
     expect(result.relativePath).toBe("uploads/Phone note.md");
@@ -52,6 +54,18 @@ describe.sequential("upload service", () => {
     expect(
       fs.readFileSync(path.join(process.env.LIBRARY_PATH!, result.relativePath), "utf8"),
     ).toContain("Sent from my phone.");
+    expect(
+      fs.readFileSync(
+        path.join(process.env.LIBRARY_PATH!, `${result.relativePath}.meta.yaml`),
+        "utf8",
+      ),
+    ).toContain("A short phone teaser.");
+    expect(
+      fs.readFileSync(
+        path.join(process.env.LIBRARY_PATH!, `${result.relativePath}.meta.yaml`),
+        "utf8",
+      ),
+    ).toContain("phone");
   });
 
   it("rejects unsupported files and oversized uploads", async () => {
