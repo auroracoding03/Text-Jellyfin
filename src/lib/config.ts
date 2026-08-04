@@ -45,5 +45,3 @@ export const config = {
 };
 
 export type AppConfig = typeof config;
-
-export type AppConfig = typeof config;
