@@ -18,6 +18,9 @@ export function DesktopAppControls() {
   const [isDesktop, setIsDesktop] = useState(false);
   const [launchAtStartup, setLaunchAtStartup] = useState(false);
   const [update, setUpdate] = useState<UpdateStatus>(initialUpdate);
+  const [lanUrls, setLanUrls] = useState<string[]>([]);
+  const [port, setPort] = useState<number | null>(null);
+  const [authUsername, setAuthUsername] = useState("admin");
   const [deleteMessage, setDeleteMessage] = useState("");
   const [deleting, setDeleting] = useState(false);
 
@@ -29,6 +32,9 @@ export function DesktopAppControls() {
     void desktop.getStatus().then((status) => {
       setLaunchAtStartup(status.launchAtStartup);
       setUpdate(status.update);
+      setLanUrls(status.lanUrls || []);
+      setPort(status.port);
+      setAuthUsername(status.authUsername || "admin");
     });
     return desktop.onUpdateStatus(setUpdate);
   }, []);
@@ -98,6 +104,42 @@ export function DesktopAppControls() {
 
   return (
     <>
+      {isDesktop ? (
+        <div className="panel">
+          <h2>Network access</h2>
+          <p style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
+            On your phone (same Wi‑Fi), open one of these addresses and sign in as{" "}
+            <code>{authUsername}</code>
+            {authUsername === "admin" ? " / admin" : ""}. Allow Text Jellyfin through Windows
+            Firewall if the page does not load.
+          </p>
+          {lanUrls.length ? (
+            <ul className="warning-list" style={{ marginBottom: "0.75rem" }}>
+              {lanUrls.map((url) => (
+                <li key={url}>
+                  <code>{url}</code>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
+              No LAN address detected yet. Check that this PC is on Wi‑Fi/Ethernet
+              {port ? (
+                <>
+                  , then try <code>{`http://<PC-IP>:${port}`}</code>
+                </>
+              ) : null}
+              .
+            </p>
+          )}
+          {port ? (
+            <p style={{ color: "var(--muted)", marginBottom: 0 }}>
+              Listening on port <code>{port}</code> for all network interfaces.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {isDesktop ? (
         <div className="panel">
           <h2>Startup</h2>

@@ -1,13 +1,15 @@
-const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, session, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
+const os = require("node:os");
 const path = require("node:path");
 
 const APP_NAME = "Text Jellyfin";
 const UPDATE_STATUS_EVENT = "text-jellyfin:update-status";
+const DEFAULT_PORT = Number(process.env.TEXT_JELLYFIN_PORT || process.env.PORT || 3000);
 
 let mainWindow;
 let serverProcess;
@@ -55,6 +57,30 @@ function launchAtStartupEnabled() {
     return app.getLoginItemSettings().openAtLogin;
   }
   return readPreferences().launchAtStartup;
+}
+
+function authCredentials() {
+  return {
+    username: process.env.AUTH_USERNAME?.trim() || "admin",
+    password: process.env.AUTH_PASSWORD || "admin",
+  };
+}
+
+function lanIpv4Addresses() {
+  const addresses = [];
+  for (const entries of Object.values(os.networkInterfaces())) {
+    for (const entry of entries || []) {
+      const family = typeof entry.family === "string" ? entry.family : String(entry.family);
+      if ((family === "IPv4" || family === "4") && !entry.internal) {
+        addresses.push(entry.address);
+      }
+    }
+  }
+  return [...new Set(addresses)];
+}
+
+function lanUrls(port) {
+  return lanIpv4Addresses().map((address) => `http://${address}:${port}`);
 }
 
 function publishUpdateStatus(nextStatus) {
@@ -147,11 +173,23 @@ function configureUpdateEvents() {
   });
 }
 
-function getAvailablePort() {
+function canListen(port, host) {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.once("error", () => resolve(false));
+    probe.listen(port, host, () => {
+      probe.close(() => resolve(true));
+    });
+  });
+}
+
+async function resolveListenPort() {
+  if (await canListen(DEFAULT_PORT, "0.0.0.0")) return DEFAULT_PORT;
+
   return new Promise((resolve, reject) => {
     const probe = net.createServer();
     probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
+    probe.listen(0, "0.0.0.0", () => {
       const { port } = probe.address();
       probe.close(() => resolve(port));
     });
@@ -179,18 +217,39 @@ function waitForServer(port, timeoutMs = 30000) {
   });
 }
 
+function installDesktopAuthHelpers() {
+  const { username, password } = authCredentials();
+  const token = Buffer.from(`${username}:${password}`, "utf8").toString("base64");
+
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const headers = { ...details.requestHeaders };
+    if (!headers.Authorization && !headers.authorization) {
+      headers.Authorization = `Basic ${token}`;
+    }
+    callback({ requestHeaders: headers });
+  });
+
+  app.on("login", (event, _webContents, _request, _authInfo, callback) => {
+    event.preventDefault();
+    callback(username, password);
+  });
+}
+
 async function startLocalServer() {
-  serverPort = await getAvailablePort();
+  serverPort = await resolveListenPort();
   const libraryPath = process.env.LIBRARY_PATH || path.join(app.getPath("documents"), "Text Jellyfin Library");
   const dataPath = process.env.DATA_PATH || app.getPath("userData");
+  const { username, password } = authCredentials();
   fs.mkdirSync(libraryPath, { recursive: true });
   fs.mkdirSync(dataPath, { recursive: true });
 
   const environment = {
     ...process.env,
+    AUTH_PASSWORD: password,
+    AUTH_USERNAME: username,
     DATA_PATH: dataPath,
     ELECTRON_RUN_AS_NODE: "1",
-    HOSTNAME: "127.0.0.1",
+    HOSTNAME: "0.0.0.0",
     LIBRARY_PATH: libraryPath,
     NODE_ENV: app.isPackaged ? "production" : "development",
     PORT: String(serverPort),
@@ -202,7 +261,7 @@ async function startLocalServer() {
     : path.join(appRoot(), "node_modules", "next", "dist", "bin", "next");
   const args = app.isPackaged
     ? [entrypoint]
-    : [entrypoint, "dev", "--hostname", "127.0.0.1", "--port", String(serverPort)];
+    : [entrypoint, "dev", "--hostname", "0.0.0.0", "--port", String(serverPort)];
 
   serverProcess = spawn(process.execPath, args, {
     cwd: app.isPackaged ? serverRoot() : appRoot(),
@@ -223,6 +282,8 @@ async function startLocalServer() {
 }
 
 function createWindow() {
+  const { username, password } = authCredentials();
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -238,6 +299,10 @@ function createWindow() {
     },
   });
   mainWindow.once("ready-to-show", () => mainWindow.show());
+  mainWindow.webContents.on("login", (event, _authenticationResponseDetails, _authInfo, callback) => {
+    event.preventDefault();
+    callback(username, password);
+  });
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (!url.startsWith(`http://127.0.0.1:${serverPort}`)) shell.openExternal(url);
     return { action: "deny" };
@@ -304,13 +369,21 @@ async function deleteServer() {
   };
 }
 
-function registerIpcHandlers() {
-  ipcMain.handle("desktop:get-status", () => ({
+function desktopStatus() {
+  const { username } = authCredentials();
+  return {
     isDesktop: true,
     launchAtStartup: launchAtStartupEnabled(),
     platform: process.platform,
     update: updateStatus,
-  }));
+    port: serverPort || DEFAULT_PORT,
+    lanUrls: lanUrls(serverPort || DEFAULT_PORT),
+    authUsername: username,
+  };
+}
+
+function registerIpcHandlers() {
+  ipcMain.handle("desktop:get-status", () => desktopStatus());
   ipcMain.handle("desktop:set-launch-at-startup", (_, enabled) => setLaunchAtStartup(enabled));
   ipcMain.handle("desktop:check-for-updates", () => checkForUpdates());
   ipcMain.handle("desktop:download-update", () => downloadUpdate());
@@ -324,6 +397,7 @@ app.whenReady().then(async () => {
   app.setAppUserModelId("com.textjellyfin.app");
   setLaunchAtStartup(readPreferences().launchAtStartup);
   configureUpdateEvents();
+  installDesktopAuthHelpers();
   registerIpcHandlers();
 
   try {

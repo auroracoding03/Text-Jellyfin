@@ -70,15 +70,21 @@ export default function SettingsPage() {
         <div className="panel">
           <h2>Login</h2>
           <p style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
-            {config.desktopMode
-              ? "Desktop mode is local-only, so the login prompt is skipped here. Network/Docker installs still use Basic Auth (default admin / admin)."
-              : <>
-                  Basic Authentication is always on. Default credentials are{" "}
-                  <code>admin</code> / <code>admin</code>
-                  {config.authIsDefault
-                    ? " — change AUTH_USERNAME and AUTH_PASSWORD in the server environment when you can."
-                    : " — this server is using custom AUTH_USERNAME / AUTH_PASSWORD values."}
-                </>}
+            {config.desktopMode ? (
+              <>
+                This desktop app is reachable on your LAN. The window signs in automatically;
+                phones and other devices use Basic Auth (default <code>admin</code> /{" "}
+                <code>admin</code>). See <strong>Network access</strong> below for the URL.
+              </>
+            ) : (
+              <>
+                Basic Authentication is always on. Default credentials are{" "}
+                <code>admin</code> / <code>admin</code>
+                {config.authIsDefault
+                  ? " — change AUTH_USERNAME and AUTH_PASSWORD in the server environment when you can."
+                  : " — this server is using custom AUTH_USERNAME / AUTH_PASSWORD values."}
+              </>
+            )}
           </p>
         </div>
 
