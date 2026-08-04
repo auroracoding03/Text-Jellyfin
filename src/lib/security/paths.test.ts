@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { assertWithinRoot, toPosixRelative } from "@/lib/security/paths";
+import {
+  assertRealPathWithinRoot,
+  assertWithinRoot,
+  toPosixRelative,
+} from "@/lib/security/paths";
 import { escapeHtml, sanitizeArticleHtml } from "@/lib/security/sanitize";
 import {
   mergeMetadata,
@@ -25,6 +29,15 @@ describe("path security", () => {
     expect(() =>
       assertWithinRoot(root, path.join(root, "..", "secrets.txt")),
     ).toThrow(/escapes root/i);
+  });
+
+  it("rejects a symlink that points outside the root", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tj-root-"));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "tj-outside-"));
+    const link = path.join(root, "outside-link");
+    fs.symlinkSync(outside, link);
+
+    expect(() => assertRealPathWithinRoot(root, link)).toThrow(/escapes root/i);
   });
 
   it("normalizes relative paths to posix", () => {

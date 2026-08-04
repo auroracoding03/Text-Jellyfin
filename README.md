@@ -16,7 +16,7 @@ Point it at a folder of `.md`, `.txt`, `.docx`, and `.pdf` files. Text Jellyfin 
 
 ## Quick start
 
-Requirements: Node.js 20+ (22/24 recommended).
+Requirements: Node.js 20–24 (22/24 recommended). Node 26 is not yet supported by the pinned SQLite driver.
 
 ```bash
 npm install

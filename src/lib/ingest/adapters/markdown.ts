@@ -26,7 +26,10 @@ export const markdownAdapter: FormatAdapter = {
   version: ADAPTER_VERSIONS.markdown,
   formats: ["md"],
   async extract(ctx: AdapterContext): Promise<AdapterResult> {
-    const raw = await fs.readFile(ctx.absolutePath, "utf8");
+    const raw = await fs.readFile(ctx.absolutePath, {
+      encoding: "utf8",
+      signal: ctx.signal,
+    });
     const { data, content } = grayMatter(raw);
     const html = await markdownToHtml(content);
     const plainText = content.replace(/[#>*_`\[\]()!-]/g, " ").replace(/\s+/g, " ").trim();

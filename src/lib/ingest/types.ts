@@ -30,6 +30,7 @@ export interface AdapterContext {
   format: DocumentFormat;
   contentHash: string;
   assetBaseUrl: string;
+  signal?: AbortSignal;
 }
 
 export interface FormatAdapter {

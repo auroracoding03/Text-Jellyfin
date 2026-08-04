@@ -1,8 +1,31 @@
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { config } from "@/lib/config";
-import { ensureDir } from "@/lib/security/paths";
+import {
+  assertRealPathWithinRoot,
+  assertWithinRoot,
+  ensureDir,
+} from "@/lib/security/paths";
 import type { AdapterAsset } from "@/lib/ingest/types";
+
+function isSafeFilename(filename: string): boolean {
+  return (
+    filename === path.basename(filename) &&
+    /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(filename) &&
+    !filename.includes("..")
+  );
+}
+
+function writeFileAtomically(filePath: string, data: string | Buffer): void {
+  const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(tempPath, data);
+    fs.renameSync(tempPath, filePath);
+  } finally {
+    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+  }
+}
 
 export function buildCacheKey(
   contentHash: string,
@@ -25,15 +48,19 @@ export function writeArticleCache(options: {
   html: string;
   assets: AdapterAsset[];
 }): { articleHtmlPath: string; assetDir: string } {
+  if (!options.assets.every((asset) => isSafeFilename(asset.filename))) {
+    throw new Error("Cache asset filename must be a simple filename");
+  }
+
   const dir = cacheDirFor(options.documentId, options.cacheKey);
   ensureDir(dir);
   ensureDir(path.join(dir, "assets"));
 
   const articleHtmlPath = path.join(dir, "article.html");
-  fs.writeFileSync(articleHtmlPath, options.html, "utf8");
+  writeFileAtomically(articleHtmlPath, options.html);
 
   for (const asset of options.assets) {
-    fs.writeFileSync(path.join(dir, "assets", asset.filename), asset.data);
+    writeFileAtomically(path.join(dir, "assets", asset.filename), asset.data);
   }
 
   return {
@@ -46,7 +73,8 @@ export function readArticleHtml(articleHtmlPath: string | null): string {
   if (!articleHtmlPath || !fs.existsSync(articleHtmlPath)) {
     return "";
   }
-  return fs.readFileSync(articleHtmlPath, "utf8");
+  const safePath = assertRealPathWithinRoot(config.cachePath, articleHtmlPath);
+  return fs.readFileSync(safePath, "utf8");
 }
 
 export function resolveCacheAsset(
@@ -54,7 +82,8 @@ export function resolveCacheAsset(
   cacheKey: string,
   filename: string,
 ): string | null {
+  if (!isSafeFilename(filename)) return null;
   const candidate = path.join(cacheDirFor(documentId, cacheKey), "assets", filename);
   if (!fs.existsSync(candidate)) return null;
-  return candidate;
+  return assertWithinRoot(config.cachePath, candidate);
 }

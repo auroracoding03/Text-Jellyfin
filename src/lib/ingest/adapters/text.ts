@@ -22,7 +22,7 @@ export const textAdapter: FormatAdapter = {
   version: ADAPTER_VERSIONS.text,
   formats: ["txt"],
   async extract(ctx: AdapterContext): Promise<AdapterResult> {
-    const buffer = await fs.readFile(ctx.absolutePath);
+    const buffer = await fs.readFile(ctx.absolutePath, { signal: ctx.signal });
     const raw = decodeText(buffer).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     const paragraphs = raw
       .split(/\n{2,}/)
