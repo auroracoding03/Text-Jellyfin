@@ -23,7 +23,7 @@ export const docxAdapter: FormatAdapter = {
   version: ADAPTER_VERSIONS.docx,
   formats: ["docx"],
   async extract(ctx: AdapterContext): Promise<AdapterResult> {
-    const buffer = await fs.readFile(ctx.absolutePath);
+    const buffer = await fs.readFile(ctx.absolutePath, { signal: ctx.signal });
     const assets: AdapterAsset[] = [];
     let imageIndex = 0;
 

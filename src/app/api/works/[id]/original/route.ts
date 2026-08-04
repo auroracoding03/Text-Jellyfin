@@ -1,12 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { NextResponse } from "next/server";
 import { config } from "@/lib/config";
 import { getDocumentById } from "@/lib/catalog/queries";
-import { assertWithinRoot } from "@/lib/security/paths";
+import { assertRealPathWithinRoot, assertWithinRoot } from "@/lib/security/paths";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function attachmentHeader(filename: string): string {
+  const fallback = filename
+    .replace(/[\r\n"]/g, "_")
+    .replace(/[^\x20-\x7e]/g, "_");
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
 
 export async function GET(
   _request: Request,
@@ -26,12 +34,14 @@ export async function GET(
       return NextResponse.json({ error: "Original missing" }, { status: 404 });
     }
 
-    const data = fs.readFileSync(absolutePath);
-    const filename = path.basename(absolutePath);
-    return new NextResponse(data, {
+    const safePath = assertRealPathWithinRoot(config.libraryPath, absolutePath);
+    const filename = path.basename(safePath);
+    const stream = Readable.toWeb(fs.createReadStream(safePath)) as ReadableStream;
+    return new NextResponse(stream, {
       headers: {
         "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": attachmentHeader(filename),
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {

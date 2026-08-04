@@ -76,7 +76,9 @@ export const pdfAdapter: FormatAdapter = {
   version: ADAPTER_VERSIONS.pdf,
   formats: ["pdf"],
   async extract(ctx: AdapterContext): Promise<AdapterResult> {
-    const data = new Uint8Array(await fs.readFile(ctx.absolutePath));
+    const data = new Uint8Array(
+      await fs.readFile(ctx.absolutePath, { signal: ctx.signal }),
+    );
 
     // pdfjs-dist v4 Node entry
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");

@@ -76,7 +76,27 @@ function getTags(db: Database.Database, documentId: string): string[] {
 }
 
 function attachTags(db: Database.Database, rows: DocumentRow[]): DocumentRecord[] {
-  return rows.map((row) => mapDocument(row, getTags(db, row.id)));
+  if (!rows.length) return [];
+
+  const documentIds = rows.map((row) => row.id);
+  const placeholders = documentIds.map(() => "?").join(", ");
+  const tagsByDocument = new Map<string, string[]>();
+  const tagRows = db
+    .prepare(
+      `SELECT document_id, tag
+       FROM document_tags
+       WHERE document_id IN (${placeholders})
+       ORDER BY document_id, tag`,
+    )
+    .all(...documentIds) as Array<{ document_id: string; tag: string }>;
+
+  for (const tagRow of tagRows) {
+    const tags = tagsByDocument.get(tagRow.document_id) || [];
+    tags.push(tagRow.tag);
+    tagsByDocument.set(tagRow.document_id, tags);
+  }
+
+  return rows.map((row) => mapDocument(row, tagsByDocument.get(row.id) || []));
 }
 
 export function ensureFtsSchema(db: Database.Database = getDb()): void {

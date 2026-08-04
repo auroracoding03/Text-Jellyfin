@@ -3,7 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { getDocumentById } from "@/lib/catalog/queries";
 import { resolveCacheAsset } from "@/lib/ingest/cache";
-import { assertWithinRoot } from "@/lib/security/paths";
+import { assertRealPathWithinRoot } from "@/lib/security/paths";
 import { config } from "@/lib/config";
 
 export const runtime = "nodejs";
@@ -15,7 +15,6 @@ const CONTENT_TYPES: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".webp": "image/webp",
-  ".svg": "image/svg+xml",
 };
 
 export async function GET(
@@ -37,13 +36,14 @@ export async function GET(
   }
 
   try {
-    assertWithinRoot(config.cachePath, assetPath);
-    const data = fs.readFileSync(assetPath);
-    const ext = path.extname(assetPath).toLowerCase();
+    const safePath = assertRealPathWithinRoot(config.cachePath, assetPath);
+    const data = fs.readFileSync(safePath);
+    const ext = path.extname(safePath).toLowerCase();
     return new NextResponse(data, {
       headers: {
         "Content-Type": CONTENT_TYPES[ext] || "application/octet-stream",
         "Cache-Control": "public, max-age=31536000, immutable",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {
