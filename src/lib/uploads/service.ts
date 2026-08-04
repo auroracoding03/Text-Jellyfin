@@ -34,7 +34,12 @@ function safeStem(value: string): string {
   return stem || "untitled";
 }
 
-function writeUpload(stem: string, format: UploadFormat, content: Buffer): string {
+function writeUpload(
+  stem: string,
+  format: UploadFormat,
+  content: Buffer,
+  subdirectory?: string,
+): string {
   if (!content.length) throw new UploadError("Upload content cannot be empty.");
   if (content.length > config.maxUploadBytes) {
     throw new UploadError(
@@ -44,7 +49,11 @@ function writeUpload(stem: string, format: UploadFormat, content: Buffer): strin
   }
 
   ensureDir(config.uploadsPath);
-  const directory = assertWithinRoot(config.libraryPath, config.uploadsPath);
+  const targetDir = subdirectory
+    ? path.join(config.uploadsPath, subdirectory)
+    : config.uploadsPath;
+  ensureDir(targetDir);
+  const directory = assertWithinRoot(config.libraryPath, targetDir);
   const extension = format === "md" ? ".md" : ".txt";
   const base = safeStem(stem);
 
@@ -75,12 +84,22 @@ function normalizeSummary(value: string | undefined): string | undefined {
 
 function writeUploadMetadata(
   absolutePath: string,
-  input: { title?: string; summary?: string; tags?: string[] },
+  input: {
+    title?: string;
+    summary?: string;
+    tags?: string[];
+    origin: "paste" | "file";
+  },
 ): void {
   const title = input.title?.trim() || undefined;
   const summary = normalizeSummary(input.summary);
   const tags = input.tags?.map((tag) => tag.trim()).filter(Boolean);
-  if (title || summary || tags?.length) writeSidecar(absolutePath, { title, summary, tags });
+  writeSidecar(absolutePath, {
+    title,
+    summary,
+    tags,
+    origin: input.origin,
+  });
 }
 
 async function indexUpload(absolutePath: string) {
@@ -104,8 +123,13 @@ export async function uploadText(input: {
   const format = normalizeFormat(input.format);
   const title = input.title.trim();
   if (!title) throw new UploadError("A title is required for pasted text.");
-  const absolutePath = writeUpload(title, format, Buffer.from(input.text, "utf8"));
-  writeUploadMetadata(absolutePath, { title, summary: input.summary, tags: input.tags });
+  const absolutePath = writeUpload(title, format, Buffer.from(input.text, "utf8"), "pasted");
+  writeUploadMetadata(absolutePath, {
+    title,
+    summary: input.summary,
+    tags: input.tags,
+    origin: "paste",
+  });
   return indexUpload(absolutePath);
 }
 
@@ -124,6 +148,7 @@ export async function uploadFile(input: {
     title: input.title,
     summary: input.summary,
     tags: input.tags,
+    origin: "file",
   });
   return indexUpload(absolutePath);
 }

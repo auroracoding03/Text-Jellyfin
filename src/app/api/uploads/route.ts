@@ -8,13 +8,6 @@ export const dynamic = "force-dynamic";
 const FORM_OVERHEAD_BYTES = 64 * 1024;
 
 export async function POST(request: Request) {
-  if (!config.authEnabled) {
-    return NextResponse.json(
-      { error: "Uploads are disabled. Configure AUTH_USERNAME and AUTH_PASSWORD." },
-      { status: 503 },
-    );
-  }
-
   const contentLength = Number(request.headers.get("content-length") || "0");
   if (contentLength > config.maxUploadBytes + FORM_OVERHEAD_BYTES) {
     return NextResponse.json(

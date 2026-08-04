@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { writeSidecar } from "@/lib/ingest/metadata";
 
 const originalLibraryPath = process.env.LIBRARY_PATH;
 const originalDataPath = process.env.DATA_PATH;
@@ -38,20 +39,43 @@ afterEach(() => {
 });
 
 describe.sequential("document content actions", () => {
-  it("reads and updates a Markdown source, then re-indexes it", async () => {
+  it("reads and updates a pasted Markdown note, then re-indexes it", async () => {
     const { actions, queries, scanner } = await loadTestModules();
-    const sourcePath = path.join(process.env.LIBRARY_PATH!, "note.md");
+    const sourcePath = path.join(
+      process.env.LIBRARY_PATH!,
+      "uploads",
+      "pasted",
+      "note.md",
+    );
+    fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
     fs.writeFileSync(sourcePath, "# First draft\n\nOriginal body.");
+    writeSidecar(sourcePath, { title: "First draft", origin: "paste" });
     await scanner.scanLibrary();
 
-    const document = queries.getDocumentByPath("note.md");
+    const document = queries.getDocumentByPath("uploads/pasted/note.md");
     expect(document).toBeTruthy();
+    expect(actions.canEditContent(document!)).toBe(true);
     expect(actions.readEditableSource(document!.id)).toContain("Original body.");
 
     await actions.updateDocumentContent(document!.id, "# Revised\n\nUpdated body.");
 
     expect(fs.readFileSync(sourcePath, "utf8")).toContain("Updated body.");
-    expect(queries.getDocumentByPath("note.md")?.summary).toContain("Revised");
+    expect(queries.getDocumentByPath("uploads/pasted/note.md")?.summary).toContain(
+      "Revised",
+    );
+  });
+
+  it("does not allow library Markdown files to be edited as notes", async () => {
+    const { actions, queries, scanner } = await loadTestModules();
+    const sourcePath = path.join(process.env.LIBRARY_PATH!, "library-note.md");
+    fs.writeFileSync(sourcePath, "# Library note\n\nBody.");
+    await scanner.scanLibrary();
+
+    const document = queries.getDocumentByPath("library-note.md");
+    expect(actions.canEditContent(document!)).toBe(false);
+    await expect(
+      actions.updateDocumentContent(document!.id, "replacement"),
+    ).rejects.toThrow("Only pasted Markdown and plain-text notes");
   });
 
   it("does not allow binary source formats to be edited", async () => {
@@ -62,7 +86,7 @@ describe.sequential("document content actions", () => {
 
     const document = queries.getDocumentByPath("document.pdf");
     await expect(actions.updateDocumentContent(document!.id, "replacement")).rejects.toThrow(
-      "Only Markdown and plain-text",
+      "Only pasted Markdown and plain-text notes",
     );
   });
 });

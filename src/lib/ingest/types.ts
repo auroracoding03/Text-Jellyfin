@@ -7,6 +7,8 @@ export interface ExtractedMetadata {
   series?: string;
   language?: string;
   tags?: string[];
+  /** Marks phone/desktop paste notes vs uploaded or library files. */
+  origin?: "paste" | "file";
 }
 
 export interface AdapterAsset {

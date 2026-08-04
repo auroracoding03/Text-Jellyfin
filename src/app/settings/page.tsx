@@ -14,8 +14,9 @@ export default function SettingsPage() {
       <section className="hero">
         <h1>Settings</h1>
         <p>
-          Text Jellyfin is intended for personal, self-hosted use. Do not expose
-          it publicly without authentication.
+          Text Jellyfin is intended for personal, self-hosted use. Sign in with
+          Basic Auth (default <code>admin</code> / <code>admin</code>) and keep it on
+          your local network.
         </p>
       </section>
 
@@ -67,11 +68,21 @@ export default function SettingsPage() {
         </div>
 
         <div className="panel">
+          <h2>Login</h2>
+          <p style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
+            Basic Authentication is always on. Default credentials are{" "}
+            <code>admin</code> / <code>admin</code>
+            {config.authIsDefault
+              ? " — change AUTH_USERNAME and AUTH_PASSWORD in the server environment when you can."
+              : " — this server is using custom AUTH_USERNAME / AUTH_PASSWORD values."}
+          </p>
+        </div>
+
+        <div className="panel">
           <h2>Phone uploads</h2>
           <p style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
-            {config.authEnabled
-              ? `Enabled — uploads up to ${Math.round(config.maxUploadBytes / 1024 / 1024)} MB are saved under uploads/.`
-              : "Disabled — set AUTH_USERNAME and AUTH_PASSWORD in the server environment to enable authenticated uploads."}
+            Enabled — uploads up to {Math.round(config.maxUploadBytes / 1024 / 1024)} MB are
+            saved under uploads/.
           </p>
         </div>
 

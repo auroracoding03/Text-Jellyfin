@@ -4,8 +4,6 @@ import { config } from "@/lib/config";
 export const dynamic = "force-dynamic";
 
 export default function UploadPage() {
-  const enabled = config.authEnabled;
-
   return (
     <main>
       <section className="hero">
@@ -17,18 +15,7 @@ export default function UploadPage() {
         </p>
       </section>
 
-      {enabled ? (
-        <UploadForm maxUploadBytes={config.maxUploadBytes} />
-      ) : (
-        <div className="panel upload-notice">
-          <h2>Uploads are disabled</h2>
-          <p>
-            Set <code>AUTH_USERNAME</code> and <code>AUTH_PASSWORD</code> in the
-            server environment, then restart Text Jellyfin. The app login protects
-            both reading and uploads.
-          </p>
-        </div>
-      )}
+      <UploadForm maxUploadBytes={config.maxUploadBytes} />
     </main>
   );
 }

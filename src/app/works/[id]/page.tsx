@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DeleteDocumentButton } from "@/components/DeleteDocumentButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TagEditor } from "@/components/TagEditor";
+import { canEditContent } from "@/lib/catalog/content-actions";
 import { getDocumentById } from "@/lib/catalog/queries";
 import { readArticleHtml } from "@/lib/ingest/cache";
 
@@ -16,6 +18,7 @@ export default async function WorkPage({
   if (!document) notFound();
 
   const html = readArticleHtml(document.articleHtmlPath);
+  const editableNote = canEditContent(document);
 
   return (
     <main className="reader-layout">
@@ -23,6 +26,7 @@ export default async function WorkPage({
         <header className="article-header">
           <div className="meta-row" style={{ marginBottom: "0.75rem" }}>
             <span className="chip">{document.format.toUpperCase()}</span>
+            {editableNote ? <span className="chip">Pasted note</span> : null}
             <StatusBadge status={document.status} />
             {document.wordCount > 0 ? (
               <span className="chip">{document.readingTimeMinutes} min read</span>
@@ -87,6 +91,11 @@ export default async function WorkPage({
         <div className="panel">
           <h2>Actions</h2>
           <div className="nav" style={{ flexDirection: "column", alignItems: "stretch" }}>
+            {editableNote ? (
+              <Link className="button button-primary" href={`/works/${document.id}/edit#note-text`}>
+                Edit note text
+              </Link>
+            ) : null}
             <Link className="button" href={`/works/${document.id}/edit`}>
               Edit record
             </Link>
@@ -96,6 +105,7 @@ export default async function WorkPage({
             <Link className="button" href="/">
               Back to library
             </Link>
+            <DeleteDocumentButton id={document.id} title={document.title} />
           </div>
         </div>
       </aside>

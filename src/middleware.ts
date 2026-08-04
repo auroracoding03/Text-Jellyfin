@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveAuthCredentials } from "@/lib/security/auth-defaults";
 import { isBasicAuthValid } from "@/lib/security/basic-auth";
 
 function challenge(): NextResponse {
@@ -12,13 +13,10 @@ function challenge(): NextResponse {
 }
 
 export function middleware(request: NextRequest) {
-  const username = process.env.AUTH_USERNAME?.trim() || "";
-  const password = process.env.AUTH_PASSWORD || "";
-
-  if (!username && !password) return NextResponse.next();
-  if (!username || !password) {
-    return new NextResponse("Authentication is misconfigured.", { status: 503 });
-  }
+  const { username, password } = resolveAuthCredentials(
+    process.env.AUTH_USERNAME,
+    process.env.AUTH_PASSWORD,
+  );
 
   return isBasicAuthValid(request.headers.get("authorization"), username, password)
     ? NextResponse.next()

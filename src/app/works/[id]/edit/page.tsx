@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DeleteDocumentButton } from "@/components/DeleteDocumentButton";
 import { DocumentContentForm } from "@/components/DocumentContentForm";
 import { MetadataForm } from "@/components/MetadataForm";
-import { canEditSource, readEditableSource } from "@/lib/catalog/content-actions";
+import { canEditContent, readEditableSource } from "@/lib/catalog/content-actions";
 import { getDocumentById } from "@/lib/catalog/queries";
 
 export const dynamic = "force-dynamic";
@@ -14,18 +15,23 @@ export default async function EditRecordPage({
 }) {
   const document = getDocumentById(params.id);
   if (!document) notFound();
+  const editableNote = canEditContent(document);
 
   return (
     <main>
       <section className="hero">
-        <h1>Edit record</h1>
+        <h1>{editableNote ? "Edit note" : "Edit record"}</h1>
         <p>
-          Update the catalog details for this article. Metadata is written to a
-          sidecar YAML file next to the source.
+          {editableNote
+            ? "Update the pasted note text and catalog details. Metadata is stored in a sidecar next to the note."
+            : "Update the catalog details for this article. Metadata is written to a sidecar YAML file next to the source. The original file stays unchanged."}
         </p>
-        <Link className="button" href={`/works/${document.id}`}>
-          Cancel
-        </Link>
+        <div className="nav">
+          <Link className="button" href={`/works/${document.id}`}>
+            Cancel
+          </Link>
+          <DeleteDocumentButton id={document.id} title={document.title} />
+        </div>
       </section>
       <MetadataForm
         id={document.id}
@@ -38,11 +44,11 @@ export default async function EditRecordPage({
           tags: document.tags.join(", "),
         }}
       />
-      {canEditSource(document.format) ? (
-        <section className="record-editor-section">
-          <h2>Source text</h2>
+      {editableNote ? (
+        <section className="record-editor-section" id="note-text">
+          <h2>Note text</h2>
           <p>
-            Edit the original {document.format === "md" ? "Markdown" : "plain-text"} file.
+            Edit the pasted {document.format === "md" ? "Markdown" : "plain-text"} note.
             Your changes will be re-indexed when saved.
           </p>
           <DocumentContentForm
@@ -54,8 +60,9 @@ export default async function EditRecordPage({
         <section className="panel record-editor-section">
           <h2>Source text</h2>
           <p>
-            This {document.format.toUpperCase()} source stays unchanged here. You can still
-            update its title, teaser, and tags above.
+            This {document.format.toUpperCase()} file is indexed as a read-only source.
+            You can still update its title, teaser, and tags above, or delete it from the
+            library.
           </p>
         </section>
       )}

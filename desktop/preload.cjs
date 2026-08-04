@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("textJellyfinDesktop", {
   checkForUpdates: () => ipcRenderer.invoke("desktop:check-for-updates"),
+  deleteServer: () => ipcRenderer.invoke("desktop:delete-server"),
   downloadUpdate: () => ipcRenderer.invoke("desktop:download-update"),
   getStatus: () => ipcRenderer.invoke("desktop:get-status"),
   installUpdate: () => ipcRenderer.invoke("desktop:install-update"),

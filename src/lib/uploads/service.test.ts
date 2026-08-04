@@ -49,23 +49,18 @@ describe.sequential("upload service", () => {
       tags: ["Phone", "inbox"],
     });
 
-    expect(result.relativePath).toBe("uploads/Phone note.md");
+    expect(result.relativePath).toBe("uploads/pasted/Phone note.md");
     expect(result.documentId).toBeTruthy();
     expect(
       fs.readFileSync(path.join(process.env.LIBRARY_PATH!, result.relativePath), "utf8"),
     ).toContain("Sent from my phone.");
-    expect(
-      fs.readFileSync(
-        path.join(process.env.LIBRARY_PATH!, `${result.relativePath}.meta.yaml`),
-        "utf8",
-      ),
-    ).toContain("A short phone teaser.");
-    expect(
-      fs.readFileSync(
-        path.join(process.env.LIBRARY_PATH!, `${result.relativePath}.meta.yaml`),
-        "utf8",
-      ),
-    ).toContain("phone");
+    const sidecar = fs.readFileSync(
+      path.join(process.env.LIBRARY_PATH!, `${result.relativePath}.meta.yaml`),
+      "utf8",
+    );
+    expect(sidecar).toContain("A short phone teaser.");
+    expect(sidecar).toContain("phone");
+    expect(sidecar).toContain("origin: paste");
   });
 
   it("rejects unsupported files and oversized uploads", async () => {

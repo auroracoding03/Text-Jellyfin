@@ -1,7 +1,7 @@
 import path from "node:path";
 import { config } from "@/lib/config";
 import { getDocumentById } from "@/lib/catalog/queries";
-import { writeSidecar } from "@/lib/ingest/metadata";
+import { readSidecar, writeSidecar } from "@/lib/ingest/metadata";
 import { assertWithinRoot } from "@/lib/security/paths";
 import { scanLibrary } from "@/lib/ingest/scanner";
 
@@ -25,6 +25,7 @@ export async function updateDocumentMetadata(
     config.libraryPath,
     path.join(config.libraryPath, document.relativePath),
   );
+  const existing = readSidecar(absolutePath);
 
   writeSidecar(absolutePath, {
     title: input.title === undefined ? document.title : input.title.trim() || undefined,
@@ -35,6 +36,7 @@ export async function updateDocumentMetadata(
     language:
       input.language === undefined ? document.language || undefined : input.language.trim() || undefined,
     tags: input.tags === undefined ? document.tags : input.tags,
+    origin: existing.metadata.origin,
   });
 
   // Re-scan so catalog and cache key stay aligned with sidecar hash.

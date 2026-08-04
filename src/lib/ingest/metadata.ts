@@ -45,6 +45,10 @@ export function readSidecar(sourcePath: string): {
     tags: Array.isArray(parsed.tags)
       ? parsed.tags.filter((tag: unknown) => typeof tag === "string")
       : undefined,
+    origin:
+      parsed.origin === "paste" || parsed.origin === "file"
+        ? parsed.origin
+        : undefined,
   };
 
   return {
@@ -65,6 +69,7 @@ export function writeSidecar(
     series: metadata.series || undefined,
     language: metadata.language || undefined,
     tags: metadata.tags?.length ? metadata.tags : undefined,
+    origin: metadata.origin || undefined,
   };
 
   fs.writeFileSync(sidecarPathFor(sourcePath), YAML.stringify(payload), "utf8");

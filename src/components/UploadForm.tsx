@@ -143,7 +143,8 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
       ) : (
         <div id="paste-text-panel" className="upload-panel" role="tabpanel">
           <p className="upload-panel-intro">
-            Paste or write the full article below. It will be saved directly in your library.
+            Paste or write the full article below. It will be saved as an editable note
+            under <code>uploads/pasted/</code>.
           </p>
           <div className="field">
             <label htmlFor="upload-format">Save pasted text as</label>

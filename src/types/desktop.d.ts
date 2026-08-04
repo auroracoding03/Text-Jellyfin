@@ -11,6 +11,7 @@ declare global {
   interface Window {
     textJellyfinDesktop?: {
       checkForUpdates: () => Promise<UpdateStatus>;
+      deleteServer: () => Promise<{ ok: boolean; message: string }>;
       downloadUpdate: () => Promise<UpdateStatus>;
       getStatus: () => Promise<{
         isDesktop: boolean;

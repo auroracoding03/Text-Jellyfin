@@ -193,6 +193,23 @@ export function getDocumentByPath(relativePath: string): DocumentRecord | null {
   return mapDocument(row, getTags(db, row.id));
 }
 
+export function deleteDocumentRecord(id: string): boolean {
+  const db = getDb();
+  ensureFtsSchema(db);
+  const existing = db
+    .prepare("SELECT id FROM documents WHERE id = ?")
+    .get(id) as { id: string } | undefined;
+  if (!existing) return false;
+
+  const tx = db.transaction(() => {
+    db.prepare("DELETE FROM document_tags WHERE document_id = ?").run(id);
+    db.prepare("DELETE FROM documents_fts WHERE document_id = ?").run(id);
+    db.prepare("DELETE FROM documents WHERE id = ?").run(id);
+  });
+  tx();
+  return true;
+}
+
 export type UpsertDocumentInput = Omit<
   DocumentRecord,
   "createdAt" | "updatedAt" | "tags"

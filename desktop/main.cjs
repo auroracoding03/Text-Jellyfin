@@ -188,6 +188,8 @@ async function startLocalServer() {
 
   const environment = {
     ...process.env,
+    AUTH_PASSWORD: process.env.AUTH_PASSWORD || "admin",
+    AUTH_USERNAME: process.env.AUTH_USERNAME || "admin",
     DATA_PATH: dataPath,
     ELECTRON_RUN_AS_NODE: "1",
     HOSTNAME: "127.0.0.1",
@@ -244,6 +246,65 @@ function createWindow() {
   mainWindow.loadURL(`http://127.0.0.1:${serverPort}`);
 }
 
+function currentLibraryPath() {
+  return process.env.LIBRARY_PATH || path.join(app.getPath("documents"), "Text Jellyfin Library");
+}
+
+function currentDataPath() {
+  return process.env.DATA_PATH || app.getPath("userData");
+}
+
+function wipeDesktopServerData() {
+  const dataPath = path.resolve(currentDataPath());
+  const libraryPath = path.resolve(currentLibraryPath());
+  if (dataPath === libraryPath) {
+    throw new Error("Refusing to wipe server data because DATA_PATH and LIBRARY_PATH are the same.");
+  }
+
+  const dbPath = path.join(dataPath, "catalog.db");
+  for (const suffix of ["", "-wal", "-shm"]) {
+    const target = `${dbPath}${suffix}`;
+    if (fs.existsSync(target)) fs.rmSync(target, { force: true });
+  }
+
+  const cachePath = path.join(dataPath, "cache");
+  if (fs.existsSync(cachePath)) fs.rmSync(cachePath, { recursive: true, force: true });
+}
+
+function findUninstaller() {
+  const directory = path.dirname(process.execPath);
+  const candidates = [
+    path.join(directory, `Uninstall ${APP_NAME}.exe`),
+    path.join(directory, "Uninstall Text Jellyfin.exe"),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate));
+}
+
+async function deleteServer() {
+  setLaunchAtStartup(false);
+
+  if (serverProcess) {
+    serverProcess.kill();
+    serverProcess = null;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  wipeDesktopServerData();
+
+  const uninstaller = app.isPackaged ? findUninstaller() : null;
+  if (uninstaller) {
+    spawn(uninstaller, ["/S"], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+  }
+
+  setTimeout(() => app.quit(), 250);
+  return {
+    ok: true,
+    message: uninstaller
+      ? "Server data deleted. The uninstaller is starting. Library files were kept."
+      : "Server data deleted. Library files were kept.",
+  };
+}
+
 function registerIpcHandlers() {
   ipcMain.handle("desktop:get-status", () => ({
     isDesktop: true,
@@ -257,6 +318,7 @@ function registerIpcHandlers() {
   ipcMain.handle("desktop:install-update", () => {
     if (updateStatus.status === "downloaded") autoUpdater.quitAndInstall(true, true);
   });
+  ipcMain.handle("desktop:delete-server", () => deleteServer());
 }
 
 app.whenReady().then(async () => {

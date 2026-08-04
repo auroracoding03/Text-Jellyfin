@@ -20,6 +20,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV LIBRARY_PATH=/library
 ENV DATA_PATH=/data
 ENV PORT=3000
+ENV AUTH_USERNAME=admin
+ENV AUTH_PASSWORD=admin
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
