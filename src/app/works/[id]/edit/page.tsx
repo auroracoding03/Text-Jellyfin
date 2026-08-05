@@ -54,6 +54,7 @@ export default async function EditRecordPage({
           <DocumentContentForm
             id={document.id}
             initialContent={readEditableSource(document.id)}
+            format={document.format}
           />
         </section>
       ) : (

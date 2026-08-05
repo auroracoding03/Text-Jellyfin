@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
+
+const RichTextEditor = dynamic(
+  () => import("@/components/RichTextEditor").then((mod) => mod.RichTextEditor),
+  {
+    ssr: false,
+    loading: () => <div className="rich-text-editor rich-text-editor-loading" />,
+  },
+);
 
 type UploadMode = "file" | "text";
 
@@ -37,7 +46,6 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
     setFile(next);
     setError(null);
     setSuccess(null);
-    // Allow selecting the same file again on iOS.
     event.target.value = "";
   }
 
@@ -157,7 +165,6 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
             className="upload-file-input"
             type="file"
             accept={FILE_ACCEPT}
-            capture={undefined}
             onChange={onFileChange}
           />
           <button className="button" type="button" onClick={chooseFile}>
@@ -177,8 +184,8 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
       ) : (
         <div id="paste-text-panel" className="upload-panel" role="tabpanel">
           <p className="upload-panel-intro">
-            Paste or write the full article below. It will be saved as an editable note
-            under <code>uploads/pasted/</code>.
+            Paste or write the full article below. Markdown notes support rich formatting;
+            plain text stays literal. Saved under <code>uploads/pasted/</code>.
           </p>
           <div className="field">
             <label htmlFor="upload-format">Save pasted text as</label>
@@ -187,20 +194,30 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
               value={format}
               onChange={(event) => setFormat(event.target.value)}
             >
-              <option value="md">Markdown</option>
+              <option value="md">Markdown (rich text)</option>
               <option value="txt">Plain text</option>
             </select>
           </div>
           <div className="field">
             <label htmlFor="upload-text">Article text</label>
-            <textarea
-              id="upload-text"
-              rows={12}
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="Write or paste your note here…"
-              required
-            />
+            {format === "md" ? (
+              <RichTextEditor
+                id="upload-text"
+                value={text}
+                onChange={setText}
+                placeholder="Write or paste your note…"
+                minHeight="16rem"
+              />
+            ) : (
+              <textarea
+                id="upload-text"
+                rows={12}
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                placeholder="Write or paste your note here…"
+                required
+              />
+            )}
           </div>
         </div>
       )}
