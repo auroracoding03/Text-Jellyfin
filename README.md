@@ -14,7 +14,7 @@ Point it at a folder of `.md`, `.txt`, `.docx`, and `.pdf` files. Text Jellyfin 
 - SQLite + FTS5 full-text search
 - Full-app Basic Auth login (default `admin` / `admin`) and phone uploads for Markdown, text files, and pasted notes
 - Docker-friendly self-hosting
-- Windows desktop installer with startup and in-app update support
+- Windows desktop installer with system tray, startup, and in-app update support
 
 ## Quick start
 
@@ -120,7 +120,10 @@ npm run build:desktop
 The resulting `dist/Text Jellyfin Setup <version>.exe` is the one-click
 per-user installer. It adds a Start Menu and Desktop shortcut, uses the ink
 quill icon, and starts the application after installation. The Settings page
-lets each user enable or disable launch at Windows sign-in.
+lets each user enable or disable launch at Windows sign-in and optionally
+**start in the system tray** (no taskbar window). Closing or minimizing the
+window hides the app to the tray while the local server keeps running for LAN
+access; Quit from the tray menu stops it.
 
 ### Release updates
 

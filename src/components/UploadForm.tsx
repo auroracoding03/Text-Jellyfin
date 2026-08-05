@@ -28,6 +28,7 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
   const [mode, setMode] = useState<UploadMode>("file");
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
+  const [author, setAuthor] = useState("");
   const [series, setSeries] = useState("");
   const [chapter, setChapter] = useState("");
   const [tags, setTags] = useState("");
@@ -69,6 +70,7 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
     body.set("kind", mode);
     body.set("title", title);
     body.set("summary", summary);
+    body.set("author", author);
     body.set("series", series);
     body.set("chapter", chapter);
     body.set("tags", tags);
@@ -149,6 +151,16 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
           placeholder="A short description for the feed"
         />
         <small>{summary.length}/500 characters</small>
+      </div>
+
+      <div className="field">
+        <label htmlFor="upload-author">Author (optional)</label>
+        <input
+          id="upload-author"
+          value={author}
+          onChange={(event) => setAuthor(event.target.value)}
+          placeholder="Who wrote this"
+        />
       </div>
 
       <div className="field">

@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     const kind = formData.get("kind");
     const title = String(formData.get("title") || "");
     const summary = String(formData.get("summary") || "");
+    const author = String(formData.get("author") || "");
     const series = String(formData.get("series") || "");
     const chapter = String(formData.get("chapter") || "");
     const tags = String(formData.get("tags") || "")
@@ -35,11 +36,20 @@ export async function POST(request: Request) {
             format: String(formData.get("format") || "txt"),
             text: String(formData.get("text") || ""),
             summary,
+            author,
             series,
             chapter,
             tags,
           })
-        : await uploadFromFile(formData.get("file"), title, summary, series, chapter, tags);
+        : await uploadFromFile(
+            formData.get("file"),
+            title,
+            summary,
+            author,
+            series,
+            chapter,
+            tags,
+          );
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
@@ -58,6 +68,7 @@ async function uploadFromFile(
   value: FormDataEntryValue | null,
   title: string,
   summary: string,
+  author: string,
   series: string,
   chapter: string,
   tags: string[],
@@ -74,6 +85,7 @@ async function uploadFromFile(
     content: Buffer.from(await value.arrayBuffer()),
     title,
     summary,
+    author,
     series,
     chapter,
     tags,

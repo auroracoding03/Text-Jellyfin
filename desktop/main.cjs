@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, session, shell } = require("electron");
+const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, session, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -10,10 +10,16 @@ const path = require("node:path");
 const APP_NAME = "Text Jellyfin";
 const UPDATE_STATUS_EVENT = "text-jellyfin:update-status";
 const DEFAULT_PORT = Number(process.env.TEXT_JELLYFIN_PORT || process.env.PORT || 3000);
+const DEFAULT_PREFERENCES = {
+  launchAtStartup: true,
+  startInTray: false,
+};
 
 let mainWindow;
+let tray;
 let serverProcess;
 let serverPort;
+let isQuitting = false;
 let updateStatus = { status: "idle", message: "Ready to check for updates." };
 
 function appRoot() {
@@ -30,9 +36,9 @@ function preferencesPath() {
 
 function readPreferences() {
   try {
-    return { launchAtStartup: true, ...JSON.parse(fs.readFileSync(preferencesPath(), "utf8")) };
+    return { ...DEFAULT_PREFERENCES, ...JSON.parse(fs.readFileSync(preferencesPath(), "utf8")) };
   } catch {
-    return { launchAtStartup: true };
+    return { ...DEFAULT_PREFERENCES };
   }
 }
 
@@ -41,15 +47,27 @@ function writePreferences(preferences) {
   fs.writeFileSync(preferencesPath(), JSON.stringify(preferences, null, 2));
 }
 
+function applyLoginItemSettings(preferences = readPreferences()) {
+  if (process.platform === "win32" || process.platform === "darwin") {
+    app.setLoginItemSettings({
+      openAtLogin: Boolean(preferences.launchAtStartup),
+      openAsHidden: Boolean(preferences.launchAtStartup && preferences.startInTray),
+    });
+  }
+}
+
 function setLaunchAtStartup(enabled) {
   const preferences = { ...readPreferences(), launchAtStartup: Boolean(enabled) };
   writePreferences(preferences);
-
-  if (process.platform === "win32" || process.platform === "darwin") {
-    app.setLoginItemSettings({ openAtLogin: preferences.launchAtStartup, openAsHidden: false });
-  }
-
+  applyLoginItemSettings(preferences);
   return preferences.launchAtStartup;
+}
+
+function setStartInTray(enabled) {
+  const preferences = { ...readPreferences(), startInTray: Boolean(enabled) };
+  writePreferences(preferences);
+  applyLoginItemSettings(preferences);
+  return preferences.startInTray;
 }
 
 function launchAtStartupEnabled() {
@@ -57,6 +75,21 @@ function launchAtStartupEnabled() {
     return app.getLoginItemSettings().openAtLogin;
   }
   return readPreferences().launchAtStartup;
+}
+
+function startInTrayEnabled() {
+  return Boolean(readPreferences().startInTray);
+}
+
+function shouldStartHidden() {
+  if (process.argv.includes("--hidden") || process.argv.includes("--start-in-tray")) {
+    return true;
+  }
+  if (startInTrayEnabled()) return true;
+  if (process.platform === "win32" || process.platform === "darwin") {
+    return Boolean(app.getLoginItemSettings().wasOpenedAsHidden);
+  }
+  return false;
 }
 
 function authCredentials() {
@@ -83,9 +116,15 @@ function lanUrls(port) {
   return lanIpv4Addresses().map((address) => `http://${address}:${port}`);
 }
 
+function localLibraryUrl() {
+  return `http://127.0.0.1:${serverPort || DEFAULT_PORT}`;
+}
+
 function publishUpdateStatus(nextStatus) {
   updateStatus = nextStatus;
-  mainWindow?.webContents.send(UPDATE_STATUS_EVENT, updateStatus);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(UPDATE_STATUS_EVENT, updateStatus);
+  }
 }
 
 function configureAutoUpdater() {
@@ -281,7 +320,82 @@ async function startLocalServer() {
   await waitForServer(serverPort);
 }
 
-function createWindow() {
+function appIconPath() {
+  return path.join(appRoot(), "assets", "icons", "icon.ico");
+}
+
+function createTrayIcon() {
+  const icon = nativeImage.createFromPath(appIconPath());
+  if (icon.isEmpty()) return nativeImage.createEmpty();
+  if (process.platform === "darwin") {
+    const sized = icon.resize({ width: 16, height: 16 });
+    sized.setTemplateImage(true);
+    return sized;
+  }
+  // Windows tray uses the multi-resolution .ico as-is.
+  return icon;
+}
+
+function hideToTray() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.setSkipTaskbar(true);
+  mainWindow.hide();
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.setSkipTaskbar(false);
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function openInBrowser() {
+  void shell.openExternal(localLibraryUrl());
+}
+
+function quitApplication() {
+  isQuitting = true;
+  app.quit();
+}
+
+function rebuildTrayMenu() {
+  if (!tray) return;
+  const urls = lanUrls(serverPort || DEFAULT_PORT);
+  const menu = Menu.buildFromTemplate([
+    {
+      label: "Open Text Jellyfin",
+      click: () => showMainWindow(),
+    },
+    {
+      label: "Open in browser",
+      click: () => openInBrowser(),
+    },
+    { type: "separator" },
+    {
+      label: urls.length ? `LAN: ${urls[0]}` : `Local: ${localLibraryUrl()}`,
+      enabled: false,
+    },
+    { type: "separator" },
+    {
+      label: "Quit",
+      click: () => quitApplication(),
+    },
+  ]);
+  tray.setContextMenu(menu);
+}
+
+function createTray() {
+  tray = new Tray(createTrayIcon());
+  tray.setToolTip(`${APP_NAME} is running`);
+  tray.on("double-click", () => showMainWindow());
+  tray.on("click", () => {
+    if (process.platform === "win32") showMainWindow();
+  });
+  rebuildTrayMenu();
+}
+
+function createWindow({ startHidden }) {
   const { username, password } = authCredentials();
 
   mainWindow = new BrowserWindow({
@@ -290,15 +404,36 @@ function createWindow() {
     minWidth: 900,
     minHeight: 640,
     show: false,
+    skipTaskbar: Boolean(startHidden),
     title: APP_NAME,
-    icon: path.join(appRoot(), "assets", "icons", "icon.ico"),
+    icon: appIconPath(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       preload: path.join(__dirname, "preload.cjs"),
     },
   });
-  mainWindow.once("ready-to-show", () => mainWindow.show());
+
+  mainWindow.once("ready-to-show", () => {
+    if (startHidden) {
+      hideToTray();
+      return;
+    }
+    showMainWindow();
+  });
+
+  mainWindow.on("close", (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    hideToTray();
+  });
+
+  mainWindow.on("minimize", (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    hideToTray();
+  });
+
   mainWindow.webContents.on("login", (event, _authenticationResponseDetails, _authInfo, callback) => {
     event.preventDefault();
     callback(username, password);
@@ -307,7 +442,7 @@ function createWindow() {
     if (!url.startsWith(`http://127.0.0.1:${serverPort}`)) shell.openExternal(url);
     return { action: "deny" };
   });
-  mainWindow.loadURL(`http://127.0.0.1:${serverPort}`);
+  mainWindow.loadURL(localLibraryUrl());
 }
 
 function currentLibraryPath() {
@@ -360,7 +495,7 @@ async function deleteServer() {
     spawn(uninstaller, ["/S"], { detached: true, stdio: "ignore", windowsHide: true }).unref();
   }
 
-  setTimeout(() => app.quit(), 250);
+  setTimeout(() => quitApplication(), 250);
   return {
     ok: true,
     message: uninstaller
@@ -374,6 +509,7 @@ function desktopStatus() {
   return {
     isDesktop: true,
     launchAtStartup: launchAtStartupEnabled(),
+    startInTray: startInTrayEnabled(),
     platform: process.platform,
     update: updateStatus,
     port: serverPort || DEFAULT_PORT,
@@ -385,33 +521,59 @@ function desktopStatus() {
 function registerIpcHandlers() {
   ipcMain.handle("desktop:get-status", () => desktopStatus());
   ipcMain.handle("desktop:set-launch-at-startup", (_, enabled) => setLaunchAtStartup(enabled));
+  ipcMain.handle("desktop:set-start-in-tray", (_, enabled) => setStartInTray(enabled));
+  ipcMain.handle("desktop:show-window", () => {
+    showMainWindow();
+    return true;
+  });
+  ipcMain.handle("desktop:hide-to-tray", () => {
+    hideToTray();
+    return true;
+  });
   ipcMain.handle("desktop:check-for-updates", () => checkForUpdates());
   ipcMain.handle("desktop:download-update", () => downloadUpdate());
   ipcMain.handle("desktop:install-update", () => {
-    if (updateStatus.status === "downloaded") autoUpdater.quitAndInstall(true, true);
+    if (updateStatus.status === "downloaded") {
+      isQuitting = true;
+      autoUpdater.quitAndInstall(true, true);
+    }
   });
   ipcMain.handle("desktop:delete-server", () => deleteServer());
 }
 
 app.whenReady().then(async () => {
   app.setAppUserModelId("com.textjellyfin.app");
-  setLaunchAtStartup(readPreferences().launchAtStartup);
+  applyLoginItemSettings(readPreferences());
   configureUpdateEvents();
   installDesktopAuthHelpers();
   registerIpcHandlers();
 
   try {
     await startLocalServer();
-    createWindow();
+    createTray();
+    createWindow({ startHidden: shouldStartHidden() });
+    rebuildTrayMenu();
     void checkForUpdates();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to start Text Jellyfin.";
     dialog.showErrorBox(APP_NAME, message);
-    app.quit();
+    quitApplication();
   }
 });
 
-app.on("before-quit", () => serverProcess?.kill());
+app.on("before-quit", () => {
+  isQuitting = true;
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
+  serverProcess?.kill();
+});
+
+app.on("activate", () => {
+  showMainWindow();
+});
+
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  // Keep the local server running in the tray on every platform.
 });

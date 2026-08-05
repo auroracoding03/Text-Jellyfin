@@ -17,6 +17,7 @@ const initialUpdate: UpdateStatus = {
 export function DesktopAppControls() {
   const [isDesktop, setIsDesktop] = useState(false);
   const [launchAtStartup, setLaunchAtStartup] = useState(false);
+  const [startInTray, setStartInTray] = useState(false);
   const [update, setUpdate] = useState<UpdateStatus>(initialUpdate);
   const [lanUrls, setLanUrls] = useState<string[]>([]);
   const [port, setPort] = useState<number | null>(null);
@@ -31,6 +32,7 @@ export function DesktopAppControls() {
     setIsDesktop(true);
     void desktop.getStatus().then((status) => {
       setLaunchAtStartup(status.launchAtStartup);
+      setStartInTray(Boolean(status.startInTray));
       setUpdate(status.update);
       setLanUrls(status.lanUrls || []);
       setPort(status.port);
@@ -41,6 +43,10 @@ export function DesktopAppControls() {
 
   const changeStartup = async (enabled: boolean) => {
     setLaunchAtStartup(await window.textJellyfinDesktop!.setLaunchAtStartup(enabled));
+  };
+
+  const changeStartInTray = async (enabled: boolean) => {
+    setStartInTray(await window.textJellyfinDesktop!.setStartInTray(enabled));
   };
 
   const updateAction = async () => {
@@ -151,6 +157,18 @@ export function DesktopAppControls() {
             />
             <span>Open Text Jellyfin when I sign in to Windows</span>
           </label>
+          <label className="desktop-toggle" style={{ marginTop: "0.85rem" }}>
+            <input
+              checked={startInTray}
+              onChange={(event) => void changeStartInTray(event.target.checked)}
+              type="checkbox"
+            />
+            <span>Start in the system tray (no taskbar window)</span>
+          </label>
+          <p style={{ color: "var(--muted)", margin: "0.75rem 0 0", fontSize: "0.9rem" }}>
+            Closing or minimizing the window hides it to the tray. Use the tray icon to open the
+            library again, or choose Quit to stop the server.
+          </p>
         </div>
       ) : null}
 

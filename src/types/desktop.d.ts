@@ -10,6 +10,7 @@ type UpdateStatus = {
 type DesktopStatus = {
   isDesktop: boolean;
   launchAtStartup: boolean;
+  startInTray: boolean;
   platform: string;
   update: UpdateStatus;
   port: number;
@@ -24,9 +25,12 @@ declare global {
       deleteServer: () => Promise<{ ok: boolean; message: string }>;
       downloadUpdate: () => Promise<UpdateStatus>;
       getStatus: () => Promise<DesktopStatus>;
+      hideToTray: () => Promise<boolean>;
       installUpdate: () => Promise<void>;
       onUpdateStatus: (listener: (status: UpdateStatus) => void) => () => void;
       setLaunchAtStartup: (enabled: boolean) => Promise<boolean>;
+      setStartInTray: (enabled: boolean) => Promise<boolean>;
+      showWindow: () => Promise<boolean>;
     };
   }
 }

@@ -89,6 +89,11 @@ function normalizeSeries(value: string | undefined): string | undefined {
   return series || undefined;
 }
 
+function normalizeAuthor(value: string | undefined): string | undefined {
+  const author = value?.trim();
+  return author || undefined;
+}
+
 function parseChapterInput(value: string | number | undefined): number | undefined {
   if (typeof value === "number") {
     if (!Number.isFinite(value) || value < 1) {
@@ -138,6 +143,7 @@ function writeUploadMetadata(
   input: {
     title?: string;
     summary?: string;
+    author?: string;
     series?: string;
     chapter?: number;
     tags?: string[];
@@ -146,11 +152,13 @@ function writeUploadMetadata(
 ): void {
   const title = input.title?.trim() || undefined;
   const summary = normalizeSummary(input.summary);
+  const author = normalizeAuthor(input.author);
   const series = normalizeSeries(input.series);
   const tags = input.tags?.map((tag) => tag.trim()).filter(Boolean);
   writeSidecar(absolutePath, {
     title,
     summary,
+    author,
     series,
     chapter: input.chapter,
     tags,
@@ -174,6 +182,7 @@ export async function uploadText(input: {
   format: string;
   text: string;
   summary?: string;
+  author?: string;
   series?: string;
   chapter?: string | number;
   tags?: string[];
@@ -181,12 +190,14 @@ export async function uploadText(input: {
   const format = normalizeFormat(input.format);
   const title = input.title.trim();
   if (!title) throw new UploadError("A title is required for pasted text.");
+  const author = normalizeAuthor(input.author);
   const series = normalizeSeries(input.series);
   const chapter = resolveUploadChapter({ title, series, chapter: input.chapter });
   const absolutePath = writeUpload(title, format, Buffer.from(input.text, "utf8"), "pasted");
   writeUploadMetadata(absolutePath, {
     title,
     summary: input.summary,
+    author,
     series,
     chapter,
     tags: input.tags,
@@ -200,6 +211,7 @@ export async function uploadFile(input: {
   content: Buffer;
   title?: string;
   summary?: string;
+  author?: string;
   series?: string;
   chapter?: string | number;
   tags?: string[];
@@ -207,6 +219,7 @@ export async function uploadFile(input: {
   const extension = path.extname(input.filename).toLowerCase();
   const format = normalizeFormat(extension.slice(1));
   const stem = input.title?.trim() || path.basename(input.filename, extension);
+  const author = normalizeAuthor(input.author);
   const series = normalizeSeries(input.series);
   const chapter = resolveUploadChapter({
     title: input.title?.trim() || stem,
@@ -217,6 +230,7 @@ export async function uploadFile(input: {
   writeUploadMetadata(absolutePath, {
     title: input.title,
     summary: input.summary,
+    author,
     series,
     chapter,
     tags: input.tags,

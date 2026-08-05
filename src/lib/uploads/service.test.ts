@@ -71,19 +71,29 @@ describe.sequential("upload service", () => {
       title: "Departure",
       format: "txt",
       text: "Once upon a time.",
+      author: "Ada",
       series: "The Long Road",
     });
     const second = await uploadText({
       title: "Crossing",
       format: "txt",
       text: "Then they crossed.",
+      author: "Ada",
       series: "The Long Road",
     });
 
     const chapterOne = queries.getDocumentByPath(first.relativePath);
     const chapterTwo = queries.getDocumentByPath(second.relativePath);
-    expect(chapterOne).toMatchObject({ series: "The Long Road", chapter: 1 });
-    expect(chapterTwo).toMatchObject({ series: "The Long Road", chapter: 2 });
+    expect(chapterOne).toMatchObject({
+      author: "Ada",
+      series: "The Long Road",
+      chapter: 1,
+    });
+    expect(chapterTwo).toMatchObject({
+      author: "Ada",
+      series: "The Long Road",
+      chapter: 2,
+    });
   });
 
   it("rejects unsupported files and oversized uploads", async () => {
