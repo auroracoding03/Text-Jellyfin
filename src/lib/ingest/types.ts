@@ -5,6 +5,7 @@ export interface ExtractedMetadata {
   summary?: string;
   author?: string;
   series?: string;
+  chapter?: number;
   language?: string;
   tags?: string[];
   /** Marks phone/desktop paste notes vs uploaded or library files. */

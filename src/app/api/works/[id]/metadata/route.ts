@@ -15,6 +15,17 @@ export async function PUT(
       ...(typeof body.summary === "string" ? { summary: body.summary } : {}),
       ...(typeof body.author === "string" ? { author: body.author } : {}),
       ...(typeof body.series === "string" ? { series: body.series } : {}),
+      ...(body.chapter === null
+        ? { chapter: null }
+        : typeof body.chapter === "number"
+          ? { chapter: body.chapter }
+          : typeof body.chapter === "string"
+            ? {
+                chapter: body.chapter.trim()
+                  ? Number(body.chapter.trim())
+                  : null,
+              }
+            : {}),
       ...(typeof body.language === "string" ? { language: body.language } : {}),
       ...(Array.isArray(body.tags)
         ? { tags: body.tags.map((tag: unknown) => String(tag)) }

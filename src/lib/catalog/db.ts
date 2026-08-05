@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS documents (
   summary TEXT NOT NULL DEFAULT '',
   author TEXT,
   series TEXT,
+  chapter INTEGER,
   language TEXT,
   file_size INTEGER NOT NULL,
   mtime_ms INTEGER NOT NULL,
@@ -74,8 +75,16 @@ CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 CREATE INDEX IF NOT EXISTS idx_documents_format ON documents(format);
 CREATE INDEX IF NOT EXISTS idx_documents_absent ON documents(absent);
+CREATE INDEX IF NOT EXISTS idx_documents_series ON documents(series);
 CREATE INDEX IF NOT EXISTS idx_document_tags_tag ON document_tags(tag);
 `;
+
+function migrateDocumentsSchema(db: Database.Database): void {
+  const columns = db.prepare("PRAGMA table_info(documents)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "chapter")) {
+    db.exec("ALTER TABLE documents ADD COLUMN chapter INTEGER");
+  }
+}
 
 export function getDb(): Database.Database {
   if (globalThis.__textJellyfinDb) {
@@ -87,6 +96,7 @@ export function getDb(): Database.Database {
 
   const db = new Database(config.dbPath);
   db.exec(SCHEMA);
+  migrateDocumentsSchema(db);
   globalThis.__textJellyfinDb = db;
   return db;
 }

@@ -13,6 +13,7 @@ export function MetadataForm({
     summary: string;
     author: string;
     series: string;
+    chapter: string;
     language: string;
     tags: string;
   };
@@ -31,6 +32,7 @@ export function MetadataForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          chapter: form.chapter.trim() ? Number(form.chapter.trim()) : null,
           tags: form.tags
             .split(",")
             .map((tag) => tag.trim())
@@ -84,6 +86,19 @@ export function MetadataForm({
           id="series"
           value={form.series}
           onChange={(event) => setForm({ ...form, series: event.target.value })}
+          placeholder="Groups chapters in the library feed"
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="chapter">Chapter number</label>
+        <input
+          id="chapter"
+          type="number"
+          min={1}
+          step={1}
+          value={form.chapter}
+          onChange={(event) => setForm({ ...form, chapter: event.target.value })}
+          placeholder="1"
         />
       </div>
       <div className="field">

@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "@/lib/config";
-import { getDocumentByPath } from "@/lib/catalog/queries";
+import { getDocumentByPath, listDocumentsBySeries } from "@/lib/catalog/queries";
+import { resolveChapterNumber } from "@/lib/catalog/series";
 import { scanLibrary } from "@/lib/ingest/scanner";
 import { writeSidecar } from "@/lib/ingest/metadata";
 import { assertWithinRoot, ensureDir, toPosixRelative } from "@/lib/security/paths";
@@ -83,21 +84,75 @@ function normalizeSummary(value: string | undefined): string | undefined {
   return summary;
 }
 
+function normalizeSeries(value: string | undefined): string | undefined {
+  const series = value?.trim();
+  return series || undefined;
+}
+
+function parseChapterInput(value: string | number | undefined): number | undefined {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value < 1) {
+      throw new UploadError("Chapter must be a positive whole number.");
+    }
+    return Math.floor(value);
+  }
+  if (value == null) return undefined;
+  const trimmed = String(value).trim();
+  if (!trimmed) return undefined;
+  if (!/^\d+$/.test(trimmed)) {
+    throw new UploadError("Chapter must be a positive whole number.");
+  }
+  const chapter = Number(trimmed);
+  if (chapter < 1) throw new UploadError("Chapter must be a positive whole number.");
+  return chapter;
+}
+
+function nextChapterForSeries(series: string): number {
+  const chapters = listDocumentsBySeries(series);
+  let max = 0;
+  for (const document of chapters) {
+    const number =
+      document.chapter ?? resolveChapterNumber(document.title) ?? 0;
+    if (number > max) max = number;
+  }
+  return max + 1;
+}
+
+function resolveUploadChapter(input: {
+  title?: string;
+  series?: string;
+  chapter?: string | number;
+}): number | undefined {
+  const explicit = parseChapterInput(input.chapter);
+  if (explicit) return explicit;
+  if (input.title) {
+    const fromTitle = resolveChapterNumber(input.title);
+    if (fromTitle) return fromTitle;
+  }
+  if (input.series) return nextChapterForSeries(input.series);
+  return undefined;
+}
+
 function writeUploadMetadata(
   absolutePath: string,
   input: {
     title?: string;
     summary?: string;
+    series?: string;
+    chapter?: number;
     tags?: string[];
     origin: "paste" | "file";
   },
 ): void {
   const title = input.title?.trim() || undefined;
   const summary = normalizeSummary(input.summary);
+  const series = normalizeSeries(input.series);
   const tags = input.tags?.map((tag) => tag.trim()).filter(Boolean);
   writeSidecar(absolutePath, {
     title,
     summary,
+    series,
+    chapter: input.chapter,
     tags,
     origin: input.origin,
   });
@@ -119,15 +174,21 @@ export async function uploadText(input: {
   format: string;
   text: string;
   summary?: string;
+  series?: string;
+  chapter?: string | number;
   tags?: string[];
 }) {
   const format = normalizeFormat(input.format);
   const title = input.title.trim();
   if (!title) throw new UploadError("A title is required for pasted text.");
+  const series = normalizeSeries(input.series);
+  const chapter = resolveUploadChapter({ title, series, chapter: input.chapter });
   const absolutePath = writeUpload(title, format, Buffer.from(input.text, "utf8"), "pasted");
   writeUploadMetadata(absolutePath, {
     title,
     summary: input.summary,
+    series,
+    chapter,
     tags: input.tags,
     origin: "paste",
   });
@@ -139,15 +200,25 @@ export async function uploadFile(input: {
   content: Buffer;
   title?: string;
   summary?: string;
+  series?: string;
+  chapter?: string | number;
   tags?: string[];
 }) {
   const extension = path.extname(input.filename).toLowerCase();
   const format = normalizeFormat(extension.slice(1));
   const stem = input.title?.trim() || path.basename(input.filename, extension);
+  const series = normalizeSeries(input.series);
+  const chapter = resolveUploadChapter({
+    title: input.title?.trim() || stem,
+    series,
+    chapter: input.chapter,
+  });
   const absolutePath = writeUpload(stem, format, input.content);
   writeUploadMetadata(absolutePath, {
     title: input.title,
     summary: input.summary,
+    series,
+    chapter,
     tags: input.tags,
     origin: "file",
   });

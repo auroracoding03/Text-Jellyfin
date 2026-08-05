@@ -63,6 +63,29 @@ describe.sequential("upload service", () => {
     expect(sidecar).toContain("origin: paste");
   });
 
+  it("stores series and auto-numbers chapters", async () => {
+    const { uploadText } = await loadUploadService();
+    const queries = await import("@/lib/catalog/queries");
+
+    const first = await uploadText({
+      title: "Departure",
+      format: "txt",
+      text: "Once upon a time.",
+      series: "The Long Road",
+    });
+    const second = await uploadText({
+      title: "Crossing",
+      format: "txt",
+      text: "Then they crossed.",
+      series: "The Long Road",
+    });
+
+    const chapterOne = queries.getDocumentByPath(first.relativePath);
+    const chapterTwo = queries.getDocumentByPath(second.relativePath);
+    expect(chapterOne).toMatchObject({ series: "The Long Road", chapter: 1 });
+    expect(chapterTwo).toMatchObject({ series: "The Long Road", chapter: 2 });
+  });
+
   it("rejects unsupported files and oversized uploads", async () => {
     const { UploadError, uploadFile, uploadText } = await loadUploadService();
 

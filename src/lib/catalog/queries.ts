@@ -17,6 +17,7 @@ type DocumentRow = {
   summary: string;
   author: string | null;
   series: string | null;
+  chapter: number | null;
   language: string | null;
   file_size: number;
   mtime_ms: number;
@@ -46,6 +47,7 @@ function mapDocument(row: DocumentRow, tags: string[]): DocumentRecord {
     summary: row.summary,
     author: row.author,
     series: row.series,
+    chapter: row.chapter == null ? null : Number(row.chapter),
     language: row.language,
     tags,
     fileSize: row.file_size,
@@ -193,6 +195,20 @@ export function getDocumentByPath(relativePath: string): DocumentRecord | null {
   return mapDocument(row, getTags(db, row.id));
 }
 
+export function listDocumentsBySeries(series: string): DocumentRecord[] {
+  const db = getDb();
+  const trimmed = series.trim();
+  if (!trimmed) return [];
+  const rows = db
+    .prepare(
+      `SELECT * FROM documents
+       WHERE absent = 0 AND series = ?
+       ORDER BY title COLLATE NOCASE`,
+    )
+    .all(trimmed) as DocumentRow[];
+  return attachTags(db, rows);
+}
+
 export function deleteDocumentRecord(id: string): boolean {
   const db = getDb();
   ensureFtsSchema(db);
@@ -235,7 +251,7 @@ export function upsertDocument(input: UpsertDocumentInput): "added" | "updated" 
       db.prepare(
         `UPDATE documents SET
           relative_path = ?, format = ?, title = ?, summary = ?, author = ?, series = ?,
-          language = ?, file_size = ?, mtime_ms = ?, content_hash = ?, sidecar_hash = ?,
+          chapter = ?, language = ?, file_size = ?, mtime_ms = ?, content_hash = ?, sidecar_hash = ?,
           cache_key = ?, article_html_path = ?, plain_text = ?, word_count = ?,
           reading_time_minutes = ?, adapter_name = ?, adapter_version = ?, status = ?,
           warnings_json = ?, indexed_at = ?, updated_at = ?, absent = ?
@@ -247,6 +263,7 @@ export function upsertDocument(input: UpsertDocumentInput): "added" | "updated" 
         input.summary,
         input.author,
         input.series,
+        input.chapter,
         input.language,
         input.fileSize,
         input.mtimeMs,
@@ -271,11 +288,11 @@ export function upsertDocument(input: UpsertDocumentInput): "added" | "updated" 
     } else {
       db.prepare(
         `INSERT INTO documents (
-          id, relative_path, format, title, summary, author, series, language,
+          id, relative_path, format, title, summary, author, series, chapter, language,
           file_size, mtime_ms, content_hash, sidecar_hash, cache_key, article_html_path,
           plain_text, word_count, reading_time_minutes, adapter_name, adapter_version,
           status, warnings_json, indexed_at, created_at, updated_at, absent
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         input.id,
         input.relativePath,
@@ -284,6 +301,7 @@ export function upsertDocument(input: UpsertDocumentInput): "added" | "updated" 
         input.summary,
         input.author,
         input.series,
+        input.chapter,
         input.language,
         input.fileSize,
         input.mtimeMs,

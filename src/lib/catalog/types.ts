@@ -16,6 +16,7 @@ export interface DocumentRecord {
   summary: string;
   author: string | null;
   series: string | null;
+  chapter: number | null;
   language: string | null;
   tags: string[];
   fileSize: number;

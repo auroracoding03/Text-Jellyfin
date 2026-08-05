@@ -40,6 +40,7 @@ export default async function EditRecordPage({
           summary: document.summary,
           author: document.author || "",
           series: document.series || "",
+          chapter: document.chapter ? String(document.chapter) : "",
           language: document.language || "",
           tags: document.tags.join(", "),
         }}

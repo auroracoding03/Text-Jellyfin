@@ -1,6 +1,8 @@
 import { DocumentCard } from "@/components/DocumentCard";
 import { SearchFilters } from "@/components/SearchFilters";
+import { SeriesCard } from "@/components/SeriesCard";
 import { getLibraryStats, listDocuments, listTags } from "@/lib/catalog/queries";
+import { buildFeedItems } from "@/lib/catalog/series";
 import type { DocumentFormat, ExtractionStatus } from "@/lib/catalog/types";
 import { scanLibrary } from "@/lib/ingest/scanner";
 import { dbExists } from "@/lib/catalog/db";
@@ -29,6 +31,7 @@ export default async function HomePage({
   const status = (searchParams.status || "") as ExtractionStatus | "";
 
   const documents = listDocuments({ q, tag, format, status });
+  const feedItems = buildFeedItems(documents);
   const tags = listTags();
   const stats = getLibraryStats();
 
@@ -52,16 +55,24 @@ export default async function HomePage({
 
       <SearchFilters q={q} tag={tag} format={format} status={status} tags={tags} />
 
-      {documents.length === 0 ? (
+      {feedItems.length === 0 ? (
         <div className="empty">
           No documents matched. Add files under your library folder and rescan
           from Settings.
         </div>
       ) : (
         <div className="library-feed">
-          {documents.map((document) => (
-            <DocumentCard key={document.id} document={document} />
-          ))}
+          {feedItems.map((item) =>
+            item.kind === "series" ? (
+              <SeriesCard
+                key={`series:${item.series}`}
+                series={item.series}
+                chapters={item.chapters}
+              />
+            ) : (
+              <DocumentCard key={item.document.id} document={item.document} />
+            ),
+          )}
         </div>
       )}
     </main>

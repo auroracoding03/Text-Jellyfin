@@ -41,6 +41,12 @@ export function readSidecar(sourcePath: string): {
     summary: typeof parsed.summary === "string" ? parsed.summary : undefined,
     author: typeof parsed.author === "string" ? parsed.author : undefined,
     series: typeof parsed.series === "string" ? parsed.series : undefined,
+    chapter:
+      typeof parsed.chapter === "number" && Number.isFinite(parsed.chapter)
+        ? Math.floor(parsed.chapter)
+        : typeof parsed.chapter === "string" && /^\d+$/.test(parsed.chapter.trim())
+          ? Number(parsed.chapter.trim())
+          : undefined,
     language: typeof parsed.language === "string" ? parsed.language : undefined,
     tags: Array.isArray(parsed.tags)
       ? parsed.tags.filter((tag: unknown) => typeof tag === "string")
@@ -67,6 +73,7 @@ export function writeSidecar(
     summary: metadata.summary || undefined,
     author: metadata.author || undefined,
     series: metadata.series || undefined,
+    chapter: metadata.chapter || undefined,
     language: metadata.language || undefined,
     tags: metadata.tags?.length ? metadata.tags : undefined,
     origin: metadata.origin || undefined,
@@ -98,7 +105,9 @@ export function mergeMetadata(
     tags,
     author: sidecar.author || embedded.author,
     series: sidecar.series || embedded.series,
+    chapter: sidecar.chapter || embedded.chapter,
     language: sidecar.language || embedded.language,
+    origin: sidecar.origin || embedded.origin,
   };
 }
 

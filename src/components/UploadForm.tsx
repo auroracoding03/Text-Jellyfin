@@ -28,6 +28,8 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
   const [mode, setMode] = useState<UploadMode>("file");
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
+  const [series, setSeries] = useState("");
+  const [chapter, setChapter] = useState("");
   const [tags, setTags] = useState("");
   const [format, setFormat] = useState("md");
   const [text, setText] = useState("");
@@ -67,6 +69,8 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
     body.set("kind", mode);
     body.set("title", title);
     body.set("summary", summary);
+    body.set("series", series);
+    body.set("chapter", chapter);
     body.set("tags", tags);
     if (mode === "file" && file) body.set("file", file, file.name);
     if (mode === "text") {
@@ -87,6 +91,7 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
       setSuccess(payload);
       setTitle("");
       setSummary("");
+      setChapter("");
       setTags("");
       setText("");
       setFile(null);
@@ -144,6 +149,34 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
           placeholder="A short description for the feed"
         />
         <small>{summary.length}/500 characters</small>
+      </div>
+
+      <div className="field">
+        <label htmlFor="upload-series">Series (optional)</label>
+        <input
+          id="upload-series"
+          value={series}
+          onChange={(event) => setSeries(event.target.value)}
+          placeholder="Same name groups chapters in the library"
+        />
+        <small>
+          Chapters with the same series appear as one block in the feed. Leave
+          chapter blank to auto-number the next installment.
+        </small>
+      </div>
+
+      <div className="field">
+        <label htmlFor="upload-chapter">Chapter number (optional)</label>
+        <input
+          id="upload-chapter"
+          type="number"
+          min={1}
+          step={1}
+          value={chapter}
+          onChange={(event) => setChapter(event.target.value)}
+          placeholder="1"
+          disabled={!series.trim()}
+        />
       </div>
 
       <div className="field">

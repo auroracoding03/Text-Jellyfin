@@ -46,6 +46,12 @@ export const markdownAdapter: FormatAdapter = {
         summary: typeof data.summary === "string" ? data.summary : undefined,
         author: typeof data.author === "string" ? data.author : undefined,
         series: typeof data.series === "string" ? data.series : undefined,
+        chapter:
+          typeof data.chapter === "number" && Number.isFinite(data.chapter)
+            ? Math.floor(data.chapter)
+            : typeof data.chapter === "string" && /^\d+$/.test(data.chapter.trim())
+              ? Number(data.chapter.trim())
+              : undefined,
         language: typeof data.language === "string" ? data.language : undefined,
         tags,
       },

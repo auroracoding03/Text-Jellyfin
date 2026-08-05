@@ -20,6 +20,9 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const kind = formData.get("kind");
     const title = String(formData.get("title") || "");
+    const summary = String(formData.get("summary") || "");
+    const series = String(formData.get("series") || "");
+    const chapter = String(formData.get("chapter") || "");
     const tags = String(formData.get("tags") || "")
       .split(",")
       .map((tag) => tag.trim())
@@ -31,15 +34,12 @@ export async function POST(request: Request) {
             title,
             format: String(formData.get("format") || "txt"),
             text: String(formData.get("text") || ""),
-            summary: String(formData.get("summary") || ""),
+            summary,
+            series,
+            chapter,
             tags,
           })
-        : await uploadFromFile(
-            formData.get("file"),
-            title,
-            String(formData.get("summary") || ""),
-            tags,
-          );
+        : await uploadFromFile(formData.get("file"), title, summary, series, chapter, tags);
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
@@ -58,6 +58,8 @@ async function uploadFromFile(
   value: FormDataEntryValue | null,
   title: string,
   summary: string,
+  series: string,
+  chapter: string,
   tags: string[],
 ) {
   if (!value || typeof value === "string" || typeof value.arrayBuffer !== "function") {
@@ -72,6 +74,8 @@ async function uploadFromFile(
     content: Buffer.from(await value.arrayBuffer()),
     title,
     summary,
+    series,
+    chapter,
     tags,
   });
 }

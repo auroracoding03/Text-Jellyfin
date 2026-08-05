@@ -12,6 +12,7 @@ export async function updateDocumentMetadata(
     summary: string;
     author: string;
     series: string;
+    chapter: number | null;
     language: string;
     tags: string[];
   }>,
@@ -27,12 +28,24 @@ export async function updateDocumentMetadata(
   );
   const existing = readSidecar(absolutePath);
 
+  let chapter: number | undefined;
+  if (input.chapter === undefined) {
+    chapter = document.chapter || undefined;
+  } else if (input.chapter === null) {
+    chapter = undefined;
+  } else if (!Number.isFinite(input.chapter) || input.chapter < 1) {
+    throw new Error("Chapter must be a positive whole number.");
+  } else {
+    chapter = Math.floor(input.chapter);
+  }
+
   writeSidecar(absolutePath, {
     title: input.title === undefined ? document.title : input.title.trim() || undefined,
     summary:
       input.summary === undefined ? document.summary : input.summary.trim() || undefined,
     author: input.author === undefined ? document.author || undefined : input.author.trim() || undefined,
     series: input.series === undefined ? document.series || undefined : input.series.trim() || undefined,
+    chapter,
     language:
       input.language === undefined ? document.language || undefined : input.language.trim() || undefined,
     tags: input.tags === undefined ? document.tags : input.tags,
