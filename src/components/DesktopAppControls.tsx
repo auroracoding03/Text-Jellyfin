@@ -71,21 +71,13 @@ export function DesktopAppControls() {
 
   const deleteServer = async () => {
     const confirmed = window.confirm(
-      isDesktop
-        ? "Delete this Text Jellyfin server and uninstall the app?\n\nYour library files and uploads stay on disk. The catalog, article cache, and application will be removed."
-        : "Delete this Text Jellyfin server data?\n\nYour library files and uploads stay on disk. The catalog and article cache will be removed.",
+      "Delete this Text Jellyfin server data?\n\nYour library files and uploads stay on disk. The catalog and article cache will be removed.",
     );
     if (!confirmed) return;
 
     setDeleting(true);
     setDeleteMessage("");
     try {
-      if (isDesktop && window.textJellyfinDesktop?.deleteServer) {
-        await window.textJellyfinDesktop.deleteServer();
-        setDeleteMessage("Deleting server and closing the app…");
-        return;
-      }
-
       const response = await fetch("/api/server", { method: "DELETE" });
       const body = (await response.json()) as { error?: string; message?: string };
       if (!response.ok) {
