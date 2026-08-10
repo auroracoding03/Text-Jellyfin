@@ -15,7 +15,12 @@ const nodeGypDirectory = path.dirname(require.resolve("node-gyp/package.json"));
 
 const rebuild = spawnSync(
   process.execPath,
-  [path.join(nodeGypDirectory, "bin", "node-gyp.js"), "rebuild", "--release"],
+  [
+    path.join(nodeGypDirectory, "bin", "node-gyp.js"),
+    "rebuild",
+    "--release",
+    "--force_build=1",
+  ],
   { cwd: betterSqliteDirectory, stdio: "inherit" },
 );
 if (rebuild.error) throw rebuild.error;
