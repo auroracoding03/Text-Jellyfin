@@ -14,8 +14,11 @@
 /out/
 
 # production
-/build
+/build/*
+!/build/*.nsh
+!/build/*.ps1
 /dist
+/.cache
 
 # misc
 .DS_Store

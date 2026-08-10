@@ -2,11 +2,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("textJellyfinDesktop", {
   checkForUpdates: () => ipcRenderer.invoke("desktop:check-for-updates"),
-  deleteServer: () => ipcRenderer.invoke("desktop:delete-server"),
   downloadUpdate: () => ipcRenderer.invoke("desktop:download-update"),
   getStatus: () => ipcRenderer.invoke("desktop:get-status"),
   hideToTray: () => ipcRenderer.invoke("desktop:hide-to-tray"),
   installUpdate: () => ipcRenderer.invoke("desktop:install-update"),
+  openServices: () => ipcRenderer.invoke("desktop:open-services"),
   onUpdateStatus: (listener) => {
     const callback = (_, status) => listener(status);
     ipcRenderer.on("text-jellyfin:update-status", callback);

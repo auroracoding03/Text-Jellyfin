@@ -72,9 +72,10 @@ export default function SettingsPage() {
           <p style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
             {config.desktopMode ? (
               <>
-                This desktop app is reachable on your LAN. The window signs in automatically;
-                phones and other devices use Basic Auth (default <code>admin</code> /{" "}
-                <code>admin</code>). See <strong>Network access</strong> below for the URL.
+                The Windows Service is reachable on your LAN. The optional desktop client signs in
+                automatically; phones and other devices use the non-default Basic Auth credentials
+                in <code>%ProgramData%\TextJellyfin\server.json</code>. See{" "}
+                <strong>Network access</strong> below for the URL.
               </>
             ) : (
               <>

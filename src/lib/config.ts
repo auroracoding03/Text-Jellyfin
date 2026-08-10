@@ -37,7 +37,10 @@ export const config = {
   authIsDefault:
     auth.username === DEFAULT_AUTH_USERNAME &&
     auth.password === DEFAULT_AUTH_PASSWORD,
-  desktopMode: process.env.TEXT_JELLYFIN_DESKTOP === "1",
+  serviceMode: process.env.TEXT_JELLYFIN_SERVICE === "1",
+  desktopMode:
+    process.env.TEXT_JELLYFIN_DESKTOP === "1" ||
+    process.env.TEXT_JELLYFIN_SERVICE === "1",
   get authEnabled() {
     return Boolean(this.authUsername && this.authPassword);
   },

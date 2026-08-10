@@ -2,20 +2,39 @@ name: Build Windows release
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_prerelease:
+        description: Publish a clearly labeled migration-test prerelease
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  machine-installer:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.19.0
           cache: npm
       - run: npm ci
-      - run: npm run build:desktop:publish
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build:desktop
+      - name: Publish migration-test prerelease
+        if: inputs.publish_prerelease
+        run: npx electron-builder --win nsis --x64 --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: text-jellyfin-v0.10.0-machine-installer
+          path: |
+            dist/Text-Jellyfin-Machine-Setup-0.10.0.exe
+            dist/machine.yml
+            dist/*.blockmap
+          if-no-files-found: error
