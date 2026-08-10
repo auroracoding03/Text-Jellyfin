@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 
 if (process.platform !== "win32") {
   throw new Error("better-sqlite3 service rebuild must run on Windows x64.");
@@ -7,13 +9,14 @@ if (process.arch !== "x64" || Number(process.versions.node.split(".")[0]) !== 24
   throw new Error(`Expected Windows x64 Node 24, received ${process.platform} ${process.arch} Node ${process.version}.`);
 }
 
-const npmCli = process.env.npm_execpath;
-if (!npmCli) throw new Error("npm_execpath is unavailable; run this script through npm.");
+const require = createRequire(import.meta.url);
+const betterSqliteDirectory = path.dirname(require.resolve("better-sqlite3/package.json"));
+const nodeGypDirectory = path.dirname(require.resolve("node-gyp/package.json"));
 
 const rebuild = spawnSync(
   process.execPath,
-  [npmCli, "rebuild", "better-sqlite3", "--build-from-source"],
-  { stdio: "inherit" },
+  [path.join(nodeGypDirectory, "bin", "node-gyp.js"), "rebuild", "--release"],
+  { cwd: betterSqliteDirectory, stdio: "inherit" },
 );
 if (rebuild.error) throw rebuild.error;
 if (rebuild.status !== 0) process.exit(rebuild.status || 1);
