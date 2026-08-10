@@ -31,6 +31,10 @@ if (!nodeEntry) throw new Error("Pinned Node archive does not contain node.exe."
 await writeFile(path.join(payload, "runtime", "node.exe"), await nodeEntry.async("nodebuffer"));
 
 await cp(standalone, path.join(payload, "server"), { recursive: true });
+const rebuiltAddon = path.join(root, "node_modules", "better-sqlite3", "build");
+const packagedAddon = path.join(payload, "server", "node_modules", "better-sqlite3");
+await cp(rebuiltAddon, path.join(packagedAddon, "build"), { recursive: true });
+await rm(path.join(packagedAddon, "prebuilds", "win32-x64.node"), { force: true });
 await cp(winswExecutable, path.join(payload, "TextJellyfin.Service.exe"));
 await cp(
   path.join(serviceSource, "TextJellyfin.Service.xml"),
