@@ -2,6 +2,7 @@
 !include "nsDialogs.nsh"
 
 !macro customHeader
+  !ifndef BUILD_UNINSTALLER
   Var TextJellyfinLibraryPath
   Var TextJellyfinLibraryInput
   Var TextJellyfinExistingService
@@ -42,11 +43,14 @@
       Abort
     ${EndIf}
   FunctionEnd
+  !endif
 !macroend
 
 !macro customWelcomePage
+  !ifndef BUILD_UNINSTALLER
   !insertmacro MUI_PAGE_WELCOME
   Page custom TextJellyfinConfigPage TextJellyfinConfigPageLeave
+  !endif
 !macroend
 
 !macro customInit
