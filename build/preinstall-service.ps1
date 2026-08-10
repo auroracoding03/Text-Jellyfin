@@ -24,7 +24,10 @@ if ($service) {
   }
 } else {
   $oldProcess = Get-Process -ErrorAction SilentlyContinue |
-    Where-Object { $_.ProcessName -in @("Text Jellyfin", "electron") -and $_.MainWindowTitle -like "*Text Jellyfin*" }
+    Where-Object {
+      $_.ProcessName -eq "Text Jellyfin" -or
+      ($_.ProcessName -eq "electron" -and $_.MainWindowTitle -like "*Text Jellyfin*")
+    }
   if ($oldProcess) {
     throw "Quit the v0.9.0 Text Jellyfin desktop app before starting the machine migration."
   }

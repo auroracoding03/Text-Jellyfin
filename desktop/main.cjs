@@ -16,6 +16,8 @@ const DEFAULT_PREFERENCES = {
   startInTray: false,
 };
 
+app.setPath("userData", path.join(app.getPath("appData"), "Text Jellyfin Machine"));
+
 let mainWindow;
 let tray;
 let serverConfig;

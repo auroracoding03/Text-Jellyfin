@@ -18,7 +18,9 @@ if ($isMigration) {
   New-Item -ItemType Directory -Path $dataPath -Force | Out-Null
 
   $passwordBytes = [byte[]]::new(24)
-  [System.Security.Cryptography.RandomNumberGenerator]::Fill($passwordBytes)
+  $random = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  $random.GetBytes($passwordBytes)
+  $random.Dispose()
   $password = [Convert]::ToBase64String($passwordBytes)
   $configuration = [ordered]@{
     libraryPath = [IO.Path]::GetFullPath($LibraryPath)
@@ -29,7 +31,8 @@ if ($isMigration) {
       password = $password
     }
   }
-  $configuration | ConvertTo-Json -Depth 4 | Set-Content -Path $configPath -Encoding UTF8
+  $configurationJson = $configuration | ConvertTo-Json -Depth 4
+  [IO.File]::WriteAllText($configPath, $configurationJson, [Text.UTF8Encoding]::new($false))
 } else {
   $configuration = Get-Content $configPath -Raw | ConvertFrom-Json
   if ($configuration.port -ne 3000) {
