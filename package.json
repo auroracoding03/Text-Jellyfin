@@ -1,6 +1,6 @@
 {
   "name": "text-jellyfin",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "main": "desktop/main.cjs",
   "repository": {
@@ -18,44 +18,59 @@
     "test:watch": "vitest",
     "desktop": "electron .",
     "desktop:dev": "electron .",
+    "download:service-runtime": "node scripts/download-windows-runtime.mjs",
+    "rebuild:service-native": "node scripts/rebuild-service-native.mjs",
     "prepare:desktop": "node scripts/prepare-desktop.mjs",
-    "build:desktop": "npm run build && npm run prepare:desktop && electron-builder --win nsis --x64 --publish never",
-    "build:desktop:publish": "npm run build && npm run prepare:desktop && electron-builder --win nsis --x64 --publish always"
+    "prepare:service": "node scripts/prepare-service-payload.mjs",
+    "build:desktop": "npm run rebuild:service-native && npm run build && npm run prepare:desktop && npm run prepare:service && electron-builder --win nsis --x64 --publish never",
+    "build:desktop:publish": "npm run rebuild:service-native && npm run build && npm run prepare:desktop && npm run prepare:service && electron-builder --win nsis --x64 --publish always"
   },
   "engines": {
-    "node": ">=22 <26"
+    "node": ">=24 <25"
   },
   "build": {
-    "appId": "com.textjellyfin.app",
+    "appId": "com.textjellyfin.machine",
     "productName": "Text Jellyfin",
     "asar": false,
     "npmRebuild": false,
     "files": [
       "desktop/**/*",
       "assets/icons/icon.ico",
-      ".next/standalone/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/service-payload",
+        "to": "service"
+      }
     ],
     "win": {
       "target": [
         "nsis"
       ],
       "icon": "assets/icons/icon.ico",
-      "requestedExecutionLevel": "asInvoker"
+      "requestedExecutionLevel": "asInvoker",
+      "artifactName": "Text-Jellyfin-Machine-Setup-${version}.${ext}"
     },
     "nsis": {
-      "oneClick": true,
-      "perMachine": false,
+      "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false,
+      "include": "build/installer.nsh",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "runAfterFinish": true
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "guid": "b3bb7270-f10d-4d56-991a-51ddd4627356"
     },
     "publish": [
       {
         "provider": "github",
         "owner": "auroracoding03",
         "repo": "Text-Jellyfin",
-        "releaseType": "release"
+        "channel": "machine",
+        "releaseType": "prerelease"
       }
     ]
   },
@@ -97,6 +112,7 @@
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "jszip": "^3.10.1",
+    "node-gyp": "^13.0.1",
     "tsx": "^4.23.5",
     "typescript": "^5",
     "vitest": "^2.1.9"

@@ -1,0 +1,24 @@
+<service>
+  <id>TextJellyfin</id>
+  <name>Text Jellyfin Library Server</name>
+  <description>Indexes and serves the Text Jellyfin document library.</description>
+  <executable>%BASE%\runtime\node.exe</executable>
+  <arguments>"%BASE%\launcher.cjs"</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+  <env name="TEXT_JELLYFIN_CONFIG" value="%ProgramData%\TextJellyfin\server.json" />
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <stoptimeout>30sec</stoptimeout>
+  <logpath>%ProgramData%\TextJellyfin\logs</logpath>
+  <onfailure action="restart" delay="15 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>4</keepFiles>
+  </log>
+</service>

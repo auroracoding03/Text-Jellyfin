@@ -1,33 +1,36 @@
 const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, session, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
-const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
-const net = require("node:net");
 const os = require("node:os");
 const path = require("node:path");
+const { readServiceConfig } = require("./service/config.cjs");
+const { serverOwnership } = require("./runtime-policy.cjs");
 
+const APP_ID = "com.textjellyfin.machine";
 const APP_NAME = "Text Jellyfin";
+const UPDATE_CHANNEL = "machine";
 const UPDATE_STATUS_EVENT = "text-jellyfin:update-status";
-const DEFAULT_PORT = Number(process.env.TEXT_JELLYFIN_PORT || process.env.PORT || 3000);
 const DEFAULT_PREFERENCES = {
-  launchAtStartup: true,
+  launchAtStartup: false,
   startInTray: false,
 };
 
+app.setPath("userData", path.join(app.getPath("appData"), "Text Jellyfin Machine"));
+
 let mainWindow;
 let tray;
-let serverProcess;
-let serverPort;
+let serverConfig;
+let serverHealth;
 let isQuitting = false;
-let updateStatus = { status: "idle", message: "Ready to check for updates." };
+let updateStatus = { status: "idle", message: "Ready to check for machine updates." };
 
 function appRoot() {
   return app.isPackaged ? path.join(process.resourcesPath, "app") : path.join(__dirname, "..");
 }
 
-function serverRoot() {
-  return path.join(appRoot(), ".next", "standalone");
+function appIconPath() {
+  return path.join(appRoot(), "assets", "icons", "icon.ico");
 }
 
 function preferencesPath() {
@@ -51,7 +54,7 @@ function applyLoginItemSettings(preferences = readPreferences()) {
   if (process.platform === "win32" || process.platform === "darwin") {
     app.setLoginItemSettings({
       openAtLogin: Boolean(preferences.launchAtStartup),
-      openAsHidden: Boolean(preferences.launchAtStartup && preferences.startInTray),
+      args: preferences.startInTray ? ["--hidden"] : [],
     });
   }
 }
@@ -67,6 +70,8 @@ function setStartInTray(enabled) {
   const preferences = { ...readPreferences(), startInTray: Boolean(enabled) };
   writePreferences(preferences);
   applyLoginItemSettings(preferences);
+  if (preferences.startInTray) createTray();
+  else destroyTray();
   return preferences.startInTray;
 }
 
@@ -77,26 +82,118 @@ function launchAtStartupEnabled() {
   return readPreferences().launchAtStartup;
 }
 
-function startInTrayEnabled() {
-  return Boolean(readPreferences().startInTray);
-}
-
 function shouldStartHidden() {
-  if (process.argv.includes("--hidden") || process.argv.includes("--start-in-tray")) {
-    return true;
-  }
-  if (startInTrayEnabled()) return true;
-  if (process.platform === "win32" || process.platform === "darwin") {
-    return Boolean(app.getLoginItemSettings().wasOpenedAsHidden);
-  }
-  return false;
+  return readPreferences().startInTray && process.argv.includes("--hidden");
 }
 
-function authCredentials() {
+function developmentConfig() {
   return {
-    username: process.env.AUTH_USERNAME?.trim() || "admin",
-    password: process.env.AUTH_PASSWORD || "admin",
+    libraryPath: process.env.LIBRARY_PATH || path.join(app.getPath("documents"), "Text Jellyfin Library"),
+    dataPath: process.env.DATA_PATH || path.join(app.getPath("userData"), "development-data"),
+    port: Number(process.env.TEXT_JELLYFIN_PORT || process.env.PORT || 3000),
+    auth: {
+      username: process.env.AUTH_USERNAME?.trim() || "admin",
+      password: process.env.AUTH_PASSWORD || "admin",
+    },
   };
+}
+
+function loadServerConfig() {
+  return app.isPackaged ? readServiceConfig() : developmentConfig();
+}
+
+function serverUrl() {
+  return `http://127.0.0.1:${serverConfig.port}`;
+}
+
+function basicAuthHeader() {
+  const token = Buffer.from(
+    `${serverConfig.auth.username}:${serverConfig.auth.password}`,
+    "utf8",
+  ).toString("base64");
+  return `Basic ${token}`;
+}
+
+function requestHealth() {
+  return new Promise((resolve, reject) => {
+    const request = http.get(
+      {
+        hostname: "127.0.0.1",
+        port: serverConfig.port,
+        path: "/api/health",
+        timeout: 1500,
+        headers: { Authorization: basicAuthHeader() },
+      },
+      (response) => {
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          body += chunk;
+        });
+        response.on("end", () => {
+          if (response.statusCode !== 200) {
+            reject(new Error(`Authenticated health check returned HTTP ${response.statusCode}.`));
+            return;
+          }
+          try {
+            resolve(JSON.parse(body));
+          } catch {
+            reject(new Error("Authenticated health check returned invalid JSON."));
+          }
+        });
+      },
+    );
+    request.on("error", reject);
+    request.on("timeout", () => request.destroy(new Error("Health check timed out.")));
+  });
+}
+
+async function waitForServer(timeoutMs = 30000) {
+  const started = Date.now();
+  let lastError;
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const health = await requestHealth();
+      if (health?.status !== "ok" || health?.name !== APP_NAME) {
+        throw new Error("Port 3000 is serving an unexpected application.");
+      }
+      if (app.isPackaged && health.serviceMode !== true) {
+        throw new Error("The server on port 3000 is not running in Windows Service mode.");
+      }
+      serverHealth = health;
+      return health;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  throw new Error(
+    `Unable to attach to the Text Jellyfin Windows Service on port ${serverConfig.port}. ` +
+      `${lastError?.message || "The service is not responding."}`,
+  );
+}
+
+function installDesktopAuthHelpers() {
+  const expectedOrigin = `${serverUrl()}/`;
+  const authorization = basicAuthHeader();
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const headers = { ...details.requestHeaders };
+    if (
+      details.url.startsWith(expectedOrigin) &&
+      !headers.Authorization &&
+      !headers.authorization
+    ) {
+      headers.Authorization = authorization;
+    }
+    callback({ requestHeaders: headers });
+  });
+
+  app.on("login", (event, _webContents, request, authInfo, callback) => {
+    if (request.url.startsWith(expectedOrigin) && authInfo.host === "127.0.0.1") {
+      event.preventDefault();
+      callback(serverConfig.auth.username, serverConfig.auth.password);
+    }
+  });
 }
 
 function lanIpv4Addresses() {
@@ -104,20 +201,14 @@ function lanIpv4Addresses() {
   for (const entries of Object.values(os.networkInterfaces())) {
     for (const entry of entries || []) {
       const family = typeof entry.family === "string" ? entry.family : String(entry.family);
-      if ((family === "IPv4" || family === "4") && !entry.internal) {
-        addresses.push(entry.address);
-      }
+      if ((family === "IPv4" || family === "4") && !entry.internal) addresses.push(entry.address);
     }
   }
   return [...new Set(addresses)];
 }
 
-function lanUrls(port) {
-  return lanIpv4Addresses().map((address) => `http://${address}:${port}`);
-}
-
-function localLibraryUrl() {
-  return `http://127.0.0.1:${serverPort || DEFAULT_PORT}`;
+function lanUrls() {
+  return lanIpv4Addresses().map((address) => `http://${address}:${serverConfig.port}`);
 }
 
 function publishUpdateStatus(nextStatus) {
@@ -131,23 +222,18 @@ function configureAutoUpdater() {
   if (app.isPackaged && !fs.existsSync(path.join(process.resourcesPath, "app-update.yml"))) {
     publishUpdateStatus({
       status: "unavailable",
-      message: "Updates are not configured for this build.",
+      message: "Machine updates are not configured for this build.",
     });
     return false;
   }
-
   if (!app.isPackaged) {
-    const url = process.env.TEXT_JELLYFIN_UPDATE_URL;
-    if (!url) {
-      publishUpdateStatus({
-        status: "unavailable",
-        message: "Updates are available in installed release builds.",
-      });
-      return false;
-    }
-    autoUpdater.setFeedURL({ provider: "generic", url });
+    publishUpdateStatus({
+      status: "unavailable",
+      message: "Updates are available only in installed machine builds.",
+    });
+    return false;
   }
-
+  autoUpdater.channel = UPDATE_CHANNEL;
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   return true;
@@ -158,10 +244,7 @@ async function checkForUpdates() {
   try {
     await autoUpdater.checkForUpdates();
   } catch (error) {
-    publishUpdateStatus({
-      status: "error",
-      message: `Could not check for updates: ${error.message}`,
-    });
+    publishUpdateStatus({ status: "error", message: `Could not check for updates: ${error.message}` });
   }
   return updateStatus;
 }
@@ -171,27 +254,24 @@ async function downloadUpdate() {
   try {
     await autoUpdater.downloadUpdate();
   } catch (error) {
-    publishUpdateStatus({
-      status: "error",
-      message: `Could not download the update: ${error.message}`,
-    });
+    publishUpdateStatus({ status: "error", message: `Could not download update: ${error.message}` });
   }
   return updateStatus;
 }
 
 function configureUpdateEvents() {
   autoUpdater.on("checking-for-update", () => {
-    publishUpdateStatus({ status: "checking", message: "Checking for a new release…" });
+    publishUpdateStatus({ status: "checking", message: "Checking the machine update channel…" });
   });
   autoUpdater.on("update-available", (info) => {
     publishUpdateStatus({
       status: "available",
       version: info.version,
-      message: `Version ${info.version} is ready to download.`,
+      message: `Machine version ${info.version} is ready to download.`,
     });
   });
   autoUpdater.on("update-not-available", () => {
-    publishUpdateStatus({ status: "not-available", message: "You are up to date." });
+    publishUpdateStatus({ status: "not-available", message: "The machine installation is up to date." });
   });
   autoUpdater.on("download-progress", (progress) => {
     publishUpdateStatus({
@@ -204,7 +284,7 @@ function configureUpdateEvents() {
     publishUpdateStatus({
       status: "downloaded",
       version: info.version,
-      message: `Version ${info.version} is ready. Restart to install it.`,
+      message: `Version ${info.version} is ready. Installing it requires UAC approval.`,
     });
   });
   autoUpdater.on("error", (error) => {
@@ -212,134 +292,9 @@ function configureUpdateEvents() {
   });
 }
 
-function canListen(port, host) {
-  return new Promise((resolve) => {
-    const probe = net.createServer();
-    probe.once("error", () => resolve(false));
-    probe.listen(port, host, () => {
-      probe.close(() => resolve(true));
-    });
-  });
-}
-
-async function resolveListenPort() {
-  if (await canListen(DEFAULT_PORT, "0.0.0.0")) return DEFAULT_PORT;
-
-  return new Promise((resolve, reject) => {
-    const probe = net.createServer();
-    probe.once("error", reject);
-    probe.listen(0, "0.0.0.0", () => {
-      const { port } = probe.address();
-      probe.close(() => resolve(port));
-    });
-  });
-}
-
-function waitForServer(port, timeoutMs = 30000) {
-  return new Promise((resolve, reject) => {
-    const started = Date.now();
-    const attempt = () => {
-      const request = http.get({ hostname: "127.0.0.1", port, path: "/", timeout: 1200 }, (response) => {
-        response.resume();
-        resolve();
-      });
-      request.on("error", () => {
-        if (Date.now() - started > timeoutMs) {
-          reject(new Error("The local Text Jellyfin server did not start in time."));
-          return;
-        }
-        setTimeout(attempt, 250);
-      });
-      request.on("timeout", () => request.destroy());
-    };
-    attempt();
-  });
-}
-
-function installDesktopAuthHelpers() {
-  const { username, password } = authCredentials();
-  const token = Buffer.from(`${username}:${password}`, "utf8").toString("base64");
-
-  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
-    const headers = { ...details.requestHeaders };
-    if (!headers.Authorization && !headers.authorization) {
-      headers.Authorization = `Basic ${token}`;
-    }
-    callback({ requestHeaders: headers });
-  });
-
-  app.on("login", (event, _webContents, _request, _authInfo, callback) => {
-    event.preventDefault();
-    callback(username, password);
-  });
-}
-
-async function startLocalServer() {
-  serverPort = await resolveListenPort();
-  const libraryPath = process.env.LIBRARY_PATH || path.join(app.getPath("documents"), "Text Jellyfin Library");
-  const dataPath = process.env.DATA_PATH || app.getPath("userData");
-  const { username, password } = authCredentials();
-  fs.mkdirSync(libraryPath, { recursive: true });
-  fs.mkdirSync(dataPath, { recursive: true });
-
-  const environment = {
-    ...process.env,
-    AUTH_PASSWORD: password,
-    AUTH_USERNAME: username,
-    DATA_PATH: dataPath,
-    ELECTRON_RUN_AS_NODE: "1",
-    HOSTNAME: "0.0.0.0",
-    LIBRARY_PATH: libraryPath,
-    NODE_ENV: app.isPackaged ? "production" : "development",
-    PORT: String(serverPort),
-    TEXT_JELLYFIN_DESKTOP: "1",
-  };
-
-  const entrypoint = app.isPackaged
-    ? path.join(serverRoot(), "server.js")
-    : path.join(appRoot(), "node_modules", "next", "dist", "bin", "next");
-  const args = app.isPackaged
-    ? [entrypoint]
-    : [entrypoint, "dev", "--hostname", "0.0.0.0", "--port", String(serverPort)];
-
-  serverProcess = spawn(process.execPath, args, {
-    cwd: app.isPackaged ? serverRoot() : appRoot(),
-    env: environment,
-    stdio: "ignore",
-    windowsHide: true,
-  });
-  serverProcess.once("exit", (code) => {
-    if (code && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send(
-        UPDATE_STATUS_EVENT,
-        { status: "error", message: `The local server stopped unexpectedly (code ${code}).` },
-      );
-    }
-  });
-
-  await waitForServer(serverPort);
-}
-
-function appIconPath() {
-  return path.join(appRoot(), "assets", "icons", "icon.ico");
-}
-
 function createTrayIcon() {
   const icon = nativeImage.createFromPath(appIconPath());
-  if (icon.isEmpty()) return nativeImage.createEmpty();
-  if (process.platform === "darwin") {
-    const sized = icon.resize({ width: 16, height: 16 });
-    sized.setTemplateImage(true);
-    return sized;
-  }
-  // Windows tray uses the multi-resolution .ico as-is.
-  return icon;
-}
-
-function hideToTray() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.setSkipTaskbar(true);
-  mainWindow.hide();
+  return icon.isEmpty() ? nativeImage.createEmpty() : icon;
 }
 
 function showMainWindow() {
@@ -350,54 +305,33 @@ function showMainWindow() {
   mainWindow.focus();
 }
 
-function openInBrowser() {
-  void shell.openExternal(localLibraryUrl());
+function hideToTray() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.setSkipTaskbar(true);
+  mainWindow.hide();
 }
 
-function quitApplication() {
-  isQuitting = true;
-  app.quit();
-}
-
-function rebuildTrayMenu() {
-  if (!tray) return;
-  const urls = lanUrls(serverPort || DEFAULT_PORT);
-  const menu = Menu.buildFromTemplate([
-    {
-      label: "Open Text Jellyfin",
-      click: () => showMainWindow(),
-    },
-    {
-      label: "Open in browser",
-      click: () => openInBrowser(),
-    },
-    { type: "separator" },
-    {
-      label: urls.length ? `LAN: ${urls[0]}` : `Local: ${localLibraryUrl()}`,
-      enabled: false,
-    },
-    { type: "separator" },
-    {
-      label: "Quit",
-      click: () => quitApplication(),
-    },
-  ]);
-  tray.setContextMenu(menu);
+function destroyTray() {
+  tray?.destroy();
+  tray = undefined;
 }
 
 function createTray() {
+  if (tray || !readPreferences().startInTray) return;
   tray = new Tray(createTrayIcon());
-  tray.setToolTip(`${APP_NAME} is running`);
-  tray.on("double-click", () => showMainWindow());
-  tray.on("click", () => {
-    if (process.platform === "win32") showMainWindow();
-  });
-  rebuildTrayMenu();
+  tray.setToolTip(`${APP_NAME} client`);
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: "Open Text Jellyfin", click: showMainWindow },
+      { label: "Open in browser", click: () => void shell.openExternal(serverUrl()) },
+      { type: "separator" },
+      { label: "Quit client", click: () => app.quit() },
+    ]),
+  );
+  tray.on("double-click", showMainWindow);
 }
 
 function createWindow({ startHidden }) {
-  const { username, password } = authCredentials();
-
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -415,106 +349,37 @@ function createWindow({ startHidden }) {
   });
 
   mainWindow.once("ready-to-show", () => {
-    if (startHidden) {
-      hideToTray();
-      return;
-    }
-    showMainWindow();
+    if (startHidden) hideToTray();
+    else showMainWindow();
   });
-
   mainWindow.on("close", (event) => {
-    if (isQuitting) return;
+    if (isQuitting || !readPreferences().startInTray) return;
     event.preventDefault();
     hideToTray();
-  });
-
-  mainWindow.on("minimize", (event) => {
-    if (isQuitting) return;
-    event.preventDefault();
-    hideToTray();
-  });
-
-  mainWindow.webContents.on("login", (event, _authenticationResponseDetails, _authInfo, callback) => {
-    event.preventDefault();
-    callback(username, password);
   });
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (!url.startsWith(`http://127.0.0.1:${serverPort}`)) shell.openExternal(url);
+    if (!url.startsWith(`${serverUrl()}/`)) void shell.openExternal(url);
     return { action: "deny" };
   });
-  mainWindow.loadURL(localLibraryUrl());
-}
-
-function currentLibraryPath() {
-  return process.env.LIBRARY_PATH || path.join(app.getPath("documents"), "Text Jellyfin Library");
-}
-
-function currentDataPath() {
-  return process.env.DATA_PATH || app.getPath("userData");
-}
-
-function wipeDesktopServerData() {
-  const dataPath = path.resolve(currentDataPath());
-  const libraryPath = path.resolve(currentLibraryPath());
-  if (dataPath === libraryPath) {
-    throw new Error("Refusing to wipe server data because DATA_PATH and LIBRARY_PATH are the same.");
-  }
-
-  const dbPath = path.join(dataPath, "catalog.db");
-  for (const suffix of ["", "-wal", "-shm"]) {
-    const target = `${dbPath}${suffix}`;
-    if (fs.existsSync(target)) fs.rmSync(target, { force: true });
-  }
-
-  const cachePath = path.join(dataPath, "cache");
-  if (fs.existsSync(cachePath)) fs.rmSync(cachePath, { recursive: true, force: true });
-}
-
-function findUninstaller() {
-  const directory = path.dirname(process.execPath);
-  const candidates = [
-    path.join(directory, `Uninstall ${APP_NAME}.exe`),
-    path.join(directory, "Uninstall Text Jellyfin.exe"),
-  ];
-  return candidates.find((candidate) => fs.existsSync(candidate));
-}
-
-async function deleteServer() {
-  setLaunchAtStartup(false);
-
-  if (serverProcess) {
-    serverProcess.kill();
-    serverProcess = null;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-
-  wipeDesktopServerData();
-
-  const uninstaller = app.isPackaged ? findUninstaller() : null;
-  if (uninstaller) {
-    spawn(uninstaller, ["/S"], { detached: true, stdio: "ignore", windowsHide: true }).unref();
-  }
-
-  setTimeout(() => quitApplication(), 250);
-  return {
-    ok: true,
-    message: uninstaller
-      ? "Server data deleted. The uninstaller is starting. Library files were kept."
-      : "Server data deleted. Library files were kept.",
-  };
+  void mainWindow.loadURL(serverUrl());
 }
 
 function desktopStatus() {
-  const { username } = authCredentials();
   return {
     isDesktop: true,
     launchAtStartup: launchAtStartupEnabled(),
-    startInTray: startInTrayEnabled(),
+    startInTray: readPreferences().startInTray,
     platform: process.platform,
     update: updateStatus,
-    port: serverPort || DEFAULT_PORT,
-    lanUrls: lanUrls(serverPort || DEFAULT_PORT),
-    authUsername: username,
+    port: serverConfig.port,
+    lanUrls: lanUrls(),
+    authUsername: serverConfig.auth.username,
+    service: {
+      healthy: serverHealth?.status === "ok",
+      mode: Boolean(serverHealth?.serviceMode),
+      version: serverHealth?.version || "unknown",
+      ownership: serverOwnership({ isPackaged: app.isPackaged }),
+    },
   };
 }
 
@@ -538,42 +403,41 @@ function registerIpcHandlers() {
       autoUpdater.quitAndInstall(true, true);
     }
   });
-  ipcMain.handle("desktop:delete-server", () => deleteServer());
+  ipcMain.handle("desktop:open-services", () => shell.openPath("C:\\Windows\\System32\\services.msc"));
 }
 
-app.whenReady().then(async () => {
-  app.setAppUserModelId("com.textjellyfin.app");
-  applyLoginItemSettings(readPreferences());
+async function startApplication() {
+  app.setAppUserModelId(APP_ID);
+  serverConfig = loadServerConfig();
   configureUpdateEvents();
   installDesktopAuthHelpers();
   registerIpcHandlers();
+  applyLoginItemSettings();
+  await waitForServer();
+  createTray();
+  createWindow({ startHidden: shouldStartHidden() });
+  void checkForUpdates();
+}
 
-  try {
-    await startLocalServer();
-    createTray();
-    createWindow({ startHidden: shouldStartHidden() });
-    rebuildTrayMenu();
-    void checkForUpdates();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to start Text Jellyfin.";
-    dialog.showErrorBox(APP_NAME, message);
-    quitApplication();
-  }
-});
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", showMainWindow);
+  app.whenReady().then(() => startApplication()).catch((error) => {
+    dialog.showErrorBox(APP_NAME, error instanceof Error ? error.message : "Unable to open Text Jellyfin.");
+    isQuitting = true;
+    app.quit();
+  });
+}
 
 app.on("before-quit", () => {
   isQuitting = true;
-  if (tray) {
-    tray.destroy();
-    tray = null;
-  }
-  serverProcess?.kill();
+  destroyTray();
 });
 
-app.on("activate", () => {
-  showMainWindow();
-});
+app.on("activate", showMainWindow);
 
 app.on("window-all-closed", () => {
-  // Keep the local server running in the tray on every platform.
+  if (!readPreferences().startInTray) app.quit();
 });

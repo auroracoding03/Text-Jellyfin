@@ -22,6 +22,12 @@ export function DesktopAppControls() {
   const [lanUrls, setLanUrls] = useState<string[]>([]);
   const [port, setPort] = useState<number | null>(null);
   const [authUsername, setAuthUsername] = useState("admin");
+  const [service, setService] = useState<{
+    healthy: boolean;
+    mode: boolean;
+    version: string;
+    ownership: "external-service" | "development-only";
+  } | null>(null);
   const [deleteMessage, setDeleteMessage] = useState("");
   const [deleting, setDeleting] = useState(false);
 
@@ -37,6 +43,7 @@ export function DesktopAppControls() {
       setLanUrls(status.lanUrls || []);
       setPort(status.port);
       setAuthUsername(status.authUsername || "admin");
+      setService(status.service);
     });
     return desktop.onUpdateStatus(setUpdate);
   }, []);
@@ -64,21 +71,13 @@ export function DesktopAppControls() {
 
   const deleteServer = async () => {
     const confirmed = window.confirm(
-      isDesktop
-        ? "Delete this Text Jellyfin server and uninstall the app?\n\nYour library files and uploads stay on disk. The catalog, article cache, and application will be removed."
-        : "Delete this Text Jellyfin server data?\n\nYour library files and uploads stay on disk. The catalog and article cache will be removed.",
+      "Delete this Text Jellyfin server data?\n\nYour library files and uploads stay on disk. The catalog and article cache will be removed.",
     );
     if (!confirmed) return;
 
     setDeleting(true);
     setDeleteMessage("");
     try {
-      if (isDesktop && window.textJellyfinDesktop?.deleteServer) {
-        await window.textJellyfinDesktop.deleteServer();
-        setDeleteMessage("Deleting server and closing the app…");
-        return;
-      }
-
       const response = await fetch("/api/server", { method: "DELETE" });
       const body = (await response.json()) as { error?: string; message?: string };
       if (!response.ok) {
@@ -112,12 +111,30 @@ export function DesktopAppControls() {
     <>
       {isDesktop ? (
         <div className="panel">
+          <h2>Windows Service</h2>
+          <p style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
+            {service?.healthy && service.mode
+              ? `Running in Windows Service mode (server v${service.version}). Closing this client does not stop the library server.`
+              : "The desktop client is attached to an external development server."}
+          </p>
+          <button
+            className="button"
+            onClick={() => void window.textJellyfinDesktop?.openServices()}
+            type="button"
+          >
+            Open Windows Services
+          </button>
+        </div>
+      ) : null}
+
+      {isDesktop ? (
+        <div className="panel">
           <h2>Network access</h2>
           <p style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
             On your phone (same Wi‑Fi), open one of these addresses and sign in as{" "}
             <code>{authUsername}</code>
-            {authUsername === "admin" ? " / admin" : ""}. Allow Text Jellyfin through Windows
-            Firewall if the page does not load.
+            . The machine installer added a Private-network firewall rule. Credentials are stored
+            in <code>%ProgramData%\TextJellyfin\server.json</code>.
           </p>
           {lanUrls.length ? (
             <ul className="warning-list" style={{ marginBottom: "0.75rem" }}>
@@ -166,8 +183,8 @@ export function DesktopAppControls() {
             <span>Start in the system tray (no taskbar window)</span>
           </label>
           <p style={{ color: "var(--muted)", margin: "0.75rem 0 0", fontSize: "0.9rem" }}>
-            Closing or minimizing the window hides it to the tray. Use the tray icon to open the
-            library again, or choose Quit to stop the server.
+            Both options are off by default. Closing the window exits only this client unless tray
+            mode is enabled; the Windows Service keeps the server running.
           </p>
         </div>
       ) : null}
@@ -178,6 +195,9 @@ export function DesktopAppControls() {
           <>
             <p aria-live="polite" style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
               {update.message}
+            </p>
+            <p style={{ color: "var(--muted)", marginBottom: "0.75rem", fontSize: "0.9rem" }}>
+              Machine updates stop and restart the Windows Service and require UAC approval.
             </p>
             <button
               className="button"
@@ -199,12 +219,11 @@ export function DesktopAppControls() {
         )}
       </div>
 
-      <div className="panel">
+      {!isDesktop ? <div className="panel">
         <h2>Delete server</h2>
         <p style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
-          Remove this Text Jellyfin server
-          {isDesktop ? " and uninstall the desktop app" : "'s catalog and cache"}. Your
-          library folder and uploaded files are not deleted.
+          Remove this Text Jellyfin server&apos;s catalog and cache. Your library folder and
+          uploaded files are not deleted.
         </p>
         {deleteMessage ? (
           <p aria-live="polite" style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>
@@ -217,9 +236,9 @@ export function DesktopAppControls() {
           onClick={() => void deleteServer()}
           type="button"
         >
-          {deleting ? "Deleting…" : isDesktop ? "Delete server & uninstall" : "Delete server data"}
+          {deleting ? "Deleting…" : "Delete server data"}
         </button>
-      </div>
+      </div> : null}
     </>
   );
 }
