@@ -23,6 +23,15 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Could not read this image."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function CoverImagePicker({
   coverUrl,
   maxBytes = CLIENT_MAX_NOTE_IMAGE_BYTES,
@@ -47,14 +56,6 @@ export function CoverImagePicker({
     }
   }, [coverUrl]);
 
-  useEffect(() => {
-    return () => {
-      if (previewUrl?.startsWith("blob:")) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
-
   async function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -67,10 +68,7 @@ export function CoverImagePicker({
         maxBytes,
         crop: "center-square",
       });
-      if (previewUrl?.startsWith("blob:")) {
-        URL.revokeObjectURL(previewUrl);
-      }
-      setPreviewUrl(URL.createObjectURL(compressed));
+      setPreviewUrl(await fileToDataUrl(compressed));
       setSelectionLabel(`${compressed.name} (${formatBytes(compressed.size)})`);
       onChange(compressed);
     } catch (error) {
@@ -81,9 +79,6 @@ export function CoverImagePicker({
   }
 
   function clearCover() {
-    if (previewUrl?.startsWith("blob:")) {
-      URL.revokeObjectURL(previewUrl);
-    }
     setPreviewUrl(null);
     setPreviewError(false);
     setSelectionLabel(null);
