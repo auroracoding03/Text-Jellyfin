@@ -30,12 +30,13 @@ turndown.addRule("noteImages", {
   replacement(_content, node) {
     const element = node as HTMLElement;
     const asset = element.getAttribute("data-asset");
-    const src = asset || element.getAttribute("src") || "";
+    const src = element.getAttribute("src") || "";
     const alt = element.getAttribute("alt") || "";
     const title = element.getAttribute("title");
-    if (!src || src.startsWith("blob:")) return "";
+    const href = asset || src;
+    if (!href || href.startsWith("blob:") || href.startsWith("data:")) return "";
     const titlePart = title ? ` "${title}"` : "";
-    return `![${alt}](${src}${titlePart})`;
+    return `![${alt}](${href}${titlePart})`;
   },
 });
 
@@ -56,7 +57,7 @@ const NoteImage = Image.extend({
 type PendingImage = {
   filename: string;
   file: File;
-  blobUrl: string;
+  previewUrl: string;
 };
 
 export type PendingNoteImage = {
@@ -76,6 +77,22 @@ type RichTextEditorProps = {
   id?: string;
   minHeight?: string;
 };
+
+function escapeAttr(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Could not read this image."));
+    reader.readAsDataURL(file);
+  });
+}
 
 function imageFilesFromDataTransfer(
   data: DataTransfer | null | undefined,
@@ -122,7 +139,7 @@ function markdownToEditorHtml(
     img.setAttribute("data-asset", asset);
     const pending = options.pending.get(filename);
     if (pending) {
-      img.setAttribute("src", pending.blobUrl);
+      img.setAttribute("src", pending.previewUrl);
     } else if (options.documentId) {
       img.setAttribute(
         "src",
@@ -187,14 +204,16 @@ export function RichTextEditor({
         if (fromAsset) refs.add(fromAsset);
         if (fromSrc) refs.add(fromSrc);
         for (const [filename, entry] of Array.from(pendingRef.current.entries())) {
-          if (entry.blobUrl === src) refs.add(filename);
+          if (entry.previewUrl === src) refs.add(filename);
         }
       }
     }
     let changed = false;
     for (const [filename, entry] of Array.from(pendingRef.current.entries())) {
       if (refs.has(filename)) continue;
-      URL.revokeObjectURL(entry.blobUrl);
+      if (entry.previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(entry.previewUrl);
+      }
       pendingRef.current.delete(filename);
       changed = true;
     }
@@ -209,7 +228,7 @@ export function RichTextEditor({
       }),
       NoteImage.configure({
         inline: false,
-        allowBase64: false,
+        allowBase64: true,
         HTMLAttributes: { class: "note-inline-image" },
       }),
       Link.configure({
@@ -271,20 +290,17 @@ export function RichTextEditor({
           continue;
         }
         const filename = newAssetFilename();
-        const blobUrl = URL.createObjectURL(compressed);
+        const previewUrl = await fileToDataUrl(compressed);
+        const asset = noteAssetMarkdownSrc(filename);
         pendingRef.current.set(filename, {
           filename,
           file: compressed,
-          blobUrl,
+          previewUrl,
         });
-        editor.chain().focus().insertContent({
-          type: "image",
-          attrs: {
-            src: blobUrl,
-            alt: file.name.replace(/\.[^.]+$/, "") || "pasted image",
-            asset: noteAssetMarkdownSrc(filename),
-          },
-        }).run();
+        const alt = file.name.replace(/\.[^.]+$/, "") || "pasted image";
+        editor.chain().focus().insertContent(
+          `<img src="${previewUrl}" alt="${escapeAttr(alt)}" data-asset="${escapeAttr(asset)}">`,
+        ).run();
       } catch (error) {
         onErrorRef.current?.(
           error instanceof Error ? error.message : "Could not insert this image.",
@@ -309,7 +325,9 @@ export function RichTextEditor({
     let changed = false;
     for (const [filename, entry] of Array.from(pendingRef.current.entries())) {
       if (refs.has(filename)) continue;
-      URL.revokeObjectURL(entry.blobUrl);
+      if (entry.previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(entry.previewUrl);
+      }
       pendingRef.current.delete(filename);
       changed = true;
     }
@@ -319,7 +337,11 @@ export function RichTextEditor({
   useEffect(() => {
     const pending = pendingRef.current;
     return () => {
-      for (const entry of Array.from(pending.values())) URL.revokeObjectURL(entry.blobUrl);
+      for (const entry of Array.from(pending.values())) {
+        if (entry.previewUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(entry.previewUrl);
+        }
+      }
     };
   }, []);
 
