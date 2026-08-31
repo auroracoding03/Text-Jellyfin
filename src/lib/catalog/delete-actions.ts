@@ -3,6 +3,7 @@ import path from "node:path";
 import { config } from "@/lib/config";
 import { deleteDocumentRecord, getDocumentById } from "@/lib/catalog/queries";
 import { sidecarPathFor } from "@/lib/ingest/metadata";
+import { deleteNoteAssetsDir } from "@/lib/notes/assets";
 import { assertRealPathWithinRoot, assertWithinRoot } from "@/lib/security/paths";
 
 export class DocumentDeleteError extends Error {}
@@ -24,6 +25,12 @@ export function deleteDocument(id: string): { relativePath: string } {
     throw new DocumentDeleteError("Invalid sidecar path.");
   }
   if (fs.existsSync(sidecarPath)) fs.unlinkSync(sidecarPath);
+
+  try {
+    deleteNoteAssetsDir(absolutePath);
+  } catch {
+    // Best effort: the source note is already gone.
+  }
 
   const cacheDocumentDir = path.join(config.cachePath, document.id);
   if (fs.existsSync(cacheDocumentDir)) {

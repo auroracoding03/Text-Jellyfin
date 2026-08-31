@@ -3,6 +3,8 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
+import type { PendingNoteImage } from "@/components/RichTextEditor";
+import { apiUrl } from "@/lib/client/api-url";
 
 const RichTextEditor = dynamic(
   () => import("@/components/RichTextEditor").then((mod) => mod.RichTextEditor),
@@ -23,7 +25,15 @@ type UploadResponse = {
 /** Keep accept loose — iOS Safari often fails to open the picker with .md-only filters. */
 const FILE_ACCEPT = "text/plain,text/markdown,text/*,.txt,.md,.markdown,.text";
 
-export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
+export function UploadForm({
+  maxUploadBytes,
+  maxNoteImages = 15,
+  maxNoteImageBytes = 1024 * 1024,
+}: {
+  maxUploadBytes: number;
+  maxNoteImages?: number;
+  maxNoteImageBytes?: number;
+}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<UploadMode>("file");
   const [title, setTitle] = useState("");
@@ -35,6 +45,7 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
   const [format, setFormat] = useState("md");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [pendingImages, setPendingImages] = useState<PendingNoteImage[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<UploadResponse | null>(null);
@@ -78,11 +89,16 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
     if (mode === "text") {
       body.set("format", format);
       body.set("text", text);
+      if (format === "md") {
+        for (const image of pendingImages) {
+          body.append("images", image.file, image.filename);
+        }
+      }
     }
 
     setPending(true);
     try {
-      const response = await fetch("/api/uploads", {
+      const response = await fetch(apiUrl("/api/uploads"), {
         method: "POST",
         body,
         credentials: "same-origin",
@@ -96,6 +112,7 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
       setChapter("");
       setTags("");
       setText("");
+      setPendingImages([]);
       setFile(null);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
@@ -229,8 +246,9 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
       ) : (
         <div id="paste-text-panel" className="upload-panel" role="tabpanel">
           <p className="upload-panel-intro">
-            Paste or write the full article below. Markdown notes support rich formatting;
-            plain text stays literal. Saved under <code>uploads/pasted/</code>.
+            Paste or write the full article below. Markdown notes support rich formatting
+            and inline images (paste, drop, or the Image button). Images are compressed
+            before saving. Plain text stays literal. Saved under <code>uploads/pasted/</code>.
           </p>
           <div className="field">
             <label htmlFor="upload-format">Save pasted text as</label>
@@ -250,6 +268,10 @@ export function UploadForm({ maxUploadBytes }: { maxUploadBytes: number }) {
                 id="upload-text"
                 value={text}
                 onChange={setText}
+                onPendingImagesChange={setPendingImages}
+                onError={setError}
+                maxNoteImages={maxNoteImages}
+                maxNoteImageBytes={maxNoteImageBytes}
                 placeholder="Write or paste your note…"
                 minHeight="16rem"
               />

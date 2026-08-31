@@ -12,7 +12,7 @@ Point it at a folder of `.md`, `.txt`, `.docx`, and `.pdf` files. Text Jellyfin 
 - Cached, sanitized HTML article reader
 - Original-file download fallback
 - SQLite + FTS5 full-text search
-- Full-app Basic Auth login (default `admin` / `admin`) and phone uploads for Markdown, text files, and pasted notes
+- Full-app Basic Auth login (default `admin` / `admin`) and phone uploads for Markdown, text files, and pasted notes (including inline images)
 - Docker-friendly self-hosting
 - Windows desktop installer with system tray, startup, and in-app update support
 
@@ -38,7 +38,10 @@ By default the library path is `fixtures/library` and app data lives in `data/`.
 | `LIBRARY_PATH` | Folder of source documents | `./fixtures/library` |
 | `DATA_PATH` | SQLite DB + generated article cache | `./data` |
 | `MAX_FILE_BYTES` | Per-file size limit | `41943040` (40 MB) |
-| `MAX_UPLOAD_BYTES` | Per-upload limit for phone uploads | `5242880` (5 MB) |
+| `MAX_UPLOAD_BYTES` | Per-upload limit for phone uploads (markdown/text body) | `5242880` (5 MB) |
+| `MAX_NOTE_IMAGE_BYTES` | Per-image limit for pasted-note images after compression | `1048576` (1 MB) |
+| `MAX_NOTE_IMAGES` | Maximum inline images per pasted Markdown note | `15` |
+| `MAX_NOTE_PAYLOAD_BYTES` | Combined markdown + images request size | `15728640` (15 MB) |
 | `AUTH_USERNAME` | Full-app Basic Authentication username | `admin` |
 | `AUTH_PASSWORD` | Full-app Basic Authentication password | `admin` |
 | `ADAPTER_TIMEOUT_MS` | Per-document extraction timeout | `60000` |
@@ -51,6 +54,10 @@ will prompt for the credentials before it can read the library or upload. Once
 authenticated, open the **Upload** page from your phone. Uploaded `.md`,
 `.markdown`, and `.txt` files are saved under `uploads/` inside your library.
 You can also paste text and choose whether to save it as Markdown or plain text.
+Pasted Markdown notes can include inline images (paste, drop, or the Image
+button). The editor compresses them to JPEG at a maximum of 1600×1600 before
+upload. Images are stored next to the note as `Note.assets/` files, not as
+base64 in the Markdown. Library `.md` files remain read-only sources.
 
 On a trusted home network, open `http://SERVER_IP:3000/upload` from your
 phone. Keep port 3000 private to that network—do not port-forward it to the

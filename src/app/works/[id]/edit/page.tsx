@@ -5,6 +5,7 @@ import { DocumentContentForm } from "@/components/DocumentContentForm";
 import { MetadataForm } from "@/components/MetadataForm";
 import { canEditContent, readEditableSource } from "@/lib/catalog/content-actions";
 import { getDocumentById } from "@/lib/catalog/queries";
+import { config } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -50,12 +51,15 @@ export default async function EditRecordPage({
           <h2>Note text</h2>
           <p>
             Edit the pasted {document.format === "md" ? "Markdown" : "plain-text"} note.
+            Markdown notes can include inline images via paste, drop, or the Image button.
             Your changes will be re-indexed when saved.
           </p>
           <DocumentContentForm
             id={document.id}
             initialContent={readEditableSource(document.id)}
             format={document.format}
+            maxNoteImages={config.maxNoteImages}
+            maxNoteImageBytes={config.maxNoteImageBytes}
           />
         </section>
       ) : (

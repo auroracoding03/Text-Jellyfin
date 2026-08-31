@@ -32,6 +32,11 @@ export const config = {
   },
   maxFileBytes: Number(process.env.MAX_FILE_BYTES || 40 * 1024 * 1024),
   maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES || 5 * 1024 * 1024),
+  maxNoteImageBytes: Number(process.env.MAX_NOTE_IMAGE_BYTES || 1 * 1024 * 1024),
+  maxNoteImages: Number(process.env.MAX_NOTE_IMAGES || 15),
+  maxNotePayloadBytes: Number(
+    process.env.MAX_NOTE_PAYLOAD_BYTES || 15 * 1024 * 1024,
+  ),
   authUsername: auth.username,
   authPassword: auth.password,
   authIsDefault:

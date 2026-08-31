@@ -106,4 +106,46 @@ describe.sequential("upload service", () => {
       uploadText({ title: "Too large", format: "txt", text: "x".repeat(65) }),
     ).rejects.toMatchObject({ status: 413 });
   });
+
+  it("saves pasted markdown images next to the note and indexes them", async () => {
+    const { uploadText } = await loadUploadService();
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9, 0x00, 0x01]);
+    const result = await uploadText({
+      title: "Illustrated",
+      format: "md",
+      text: "A chapter with a picture.\n\n![scene](note-assets/photo.jpg)",
+      images: [{ filename: "photo.jpg", data: jpeg }],
+    });
+
+    const assetPath = path.join(
+      process.env.LIBRARY_PATH!,
+      "uploads",
+      "pasted",
+      "Illustrated.assets",
+      "photo.jpg",
+    );
+    expect(fs.existsSync(assetPath)).toBe(true);
+    const queries = await import("@/lib/catalog/queries");
+    const document = queries.getDocumentByPath(result.relativePath);
+    expect(document?.articleHtmlPath).toBeTruthy();
+    const html = fs.readFileSync(document!.articleHtmlPath!, "utf8");
+    expect(html).toContain(`/api/works/${document!.id}/assets/photo.jpg`);
+  });
+
+  it("rejects svg note images", async () => {
+    const { UploadError, uploadText } = await loadUploadService();
+    await expect(
+      uploadText({
+        title: "Bad image",
+        format: "md",
+        text: "![x](note-assets/icon.svg)",
+        images: [
+          {
+            filename: "icon.svg",
+            data: Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'></svg>"),
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(UploadError);
+  });
 });

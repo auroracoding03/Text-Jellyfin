@@ -66,4 +66,35 @@ describe.sequential("deleteDocument", () => {
     expect(fs.existsSync(cacheDir)).toBe(false);
     expect(queries.getDocumentById(document!.id)).toBeNull();
   });
+
+  it("removes the sibling .assets directory for illustrated notes", async () => {
+    const { actions, queries, scanner } = await loadTestModules();
+    const sourcePath = path.join(
+      process.env.LIBRARY_PATH!,
+      "uploads",
+      "pasted",
+      "illustrated.md",
+    );
+    const assetsDir = path.join(
+      process.env.LIBRARY_PATH!,
+      "uploads",
+      "pasted",
+      "illustrated.assets",
+    );
+    fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+    fs.mkdirSync(assetsDir, { recursive: true });
+    fs.writeFileSync(sourcePath, "![scene](note-assets/photo.jpg)");
+    fs.writeFileSync(
+      path.join(assetsDir, "photo.jpg"),
+      Buffer.from([0xff, 0xd8, 0xff, 0xd9, 0x00, 0x01]),
+    );
+    writeSidecar(sourcePath, { title: "Illustrated", origin: "paste" });
+    await scanner.scanLibrary();
+
+    const document = queries.getDocumentByPath("uploads/pasted/illustrated.md");
+    actions.deleteDocument(document!.id);
+
+    expect(fs.existsSync(sourcePath)).toBe(false);
+    expect(fs.existsSync(assetsDir)).toBe(false);
+  });
 });

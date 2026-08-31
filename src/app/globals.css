@@ -732,6 +732,12 @@ textarea:focus-visible {
   color: var(--brand);
 }
 
+.rich-text-editor .tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+}
+
 .rich-text-editor .tiptap blockquote {
   border-left: 3px solid var(--line);
   padding-left: 0.85rem;

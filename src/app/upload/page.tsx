@@ -15,7 +15,11 @@ export default function UploadPage() {
         </p>
       </section>
 
-      <UploadForm maxUploadBytes={config.maxUploadBytes} />
+      <UploadForm
+        maxUploadBytes={config.maxUploadBytes}
+        maxNoteImages={config.maxNoteImages}
+        maxNoteImageBytes={config.maxNoteImageBytes}
+      />
     </main>
   );
 }
