@@ -1,11 +1,14 @@
 const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, session, shell } = require("electron");
-const { autoUpdater } = require("electron-updater");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const os = require("node:os");
 const path = require("node:path");
+const { describeAvailability, loadAutoUpdater, runUpdateAction } = require("./updater.cjs");
+
+const vendorUpdater = path.join(__dirname, "vendor", "updater");
+const { autoUpdater, loadError: updaterLoadError } = loadAutoUpdater({ vendorDir: vendorUpdater });
 
 const APP_NAME = "Text Jellyfin";
 const UPDATE_STATUS_EVENT = "text-jellyfin:update-status";
@@ -142,24 +145,23 @@ function publishUpdateStatus(nextStatus) {
 }
 
 function configureAutoUpdater() {
-  if (app.isPackaged && !fs.existsSync(path.join(process.resourcesPath, "app-update.yml"))) {
+  const availability = describeAvailability({
+    autoUpdater,
+    loadError: updaterLoadError,
+    isPackaged: app.isPackaged,
+    hasAppUpdateYml: fs.existsSync(path.join(process.resourcesPath, "app-update.yml")),
+    genericFeedUrl: process.env.TEXT_JELLYFIN_UPDATE_URL,
+  });
+  if (!availability.ready) {
     publishUpdateStatus({
-      status: "unavailable",
-      message: "Updates are not configured for this build.",
+      status: availability.status,
+      message: availability.message,
     });
     return false;
   }
 
-  if (!app.isPackaged) {
-    const url = process.env.TEXT_JELLYFIN_UPDATE_URL;
-    if (!url) {
-      publishUpdateStatus({
-        status: "unavailable",
-        message: "Updates are available in installed release builds.",
-      });
-      return false;
-    }
-    autoUpdater.setFeedURL({ provider: "generic", url });
+  if (availability.genericFeedUrl) {
+    autoUpdater.setFeedURL({ provider: "generic", url: availability.genericFeedUrl });
   }
 
   autoUpdater.autoDownload = false;
@@ -169,31 +171,26 @@ function configureAutoUpdater() {
 
 async function checkForUpdates() {
   if (!configureAutoUpdater()) return updateStatus;
-  try {
-    await autoUpdater.checkForUpdates();
-  } catch (error) {
-    publishUpdateStatus({
-      status: "error",
-      message: `Could not check for updates: ${error.message}`,
-    });
-  }
+  const failure = await runUpdateAction(
+    () => autoUpdater.checkForUpdates(),
+    "Could not check for updates",
+  );
+  if (failure) publishUpdateStatus(failure);
   return updateStatus;
 }
 
 async function downloadUpdate() {
-  if (updateStatus.status !== "available") return updateStatus;
-  try {
-    await autoUpdater.downloadUpdate();
-  } catch (error) {
-    publishUpdateStatus({
-      status: "error",
-      message: `Could not download the update: ${error.message}`,
-    });
-  }
+  if (!autoUpdater || updateStatus.status !== "available") return updateStatus;
+  const failure = await runUpdateAction(
+    () => autoUpdater.downloadUpdate(),
+    "Could not download the update",
+  );
+  if (failure) publishUpdateStatus(failure);
   return updateStatus;
 }
 
 function configureUpdateEvents() {
+  if (!autoUpdater) return;
   autoUpdater.on("checking-for-update", () => {
     publishUpdateStatus({ status: "checking", message: "Checking for a new release…" });
   });
@@ -547,7 +544,7 @@ function registerIpcHandlers() {
   ipcMain.handle("desktop:check-for-updates", () => checkForUpdates());
   ipcMain.handle("desktop:download-update", () => downloadUpdate());
   ipcMain.handle("desktop:install-update", () => {
-    if (updateStatus.status === "downloaded") {
+    if (updateStatus.status === "downloaded" && autoUpdater) {
       isQuitting = true;
       autoUpdater.quitAndInstall(true, true);
     }

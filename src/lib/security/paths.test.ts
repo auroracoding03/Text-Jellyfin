@@ -35,7 +35,13 @@ describe("path security", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "tj-root-"));
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), "tj-outside-"));
     const link = path.join(root, "outside-link");
-    fs.symlinkSync(outside, link);
+    try {
+      fs.symlinkSync(outside, link);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "EPERM" || code === "EACCES") return;
+      throw error;
+    }
 
     expect(() => assertRealPathWithinRoot(root, link)).toThrow(/escapes root/i);
   });

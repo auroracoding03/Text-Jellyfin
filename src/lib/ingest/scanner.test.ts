@@ -61,7 +61,13 @@ describe.sequential("library scanner", () => {
     const { scanner, queries } = await loadTestModules();
     const outside = path.join(tempDir!, "outside.md");
     fs.writeFileSync(outside, "# Outside");
-    fs.symlinkSync(outside, path.join(process.env.LIBRARY_PATH!, "outside.md"));
+    try {
+      fs.symlinkSync(outside, path.join(process.env.LIBRARY_PATH!, "outside.md"));
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "EPERM" || code === "EACCES") return;
+      throw error;
+    }
 
     const result = await scanner.scanLibrary();
     expect(result.scanned).toBe(0);
