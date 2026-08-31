@@ -97,4 +97,31 @@ describe.sequential("deleteDocument", () => {
     expect(fs.existsSync(sourcePath)).toBe(false);
     expect(fs.existsSync(assetsDir)).toBe(false);
   });
+
+  it("removes the sibling cover file when present", async () => {
+    const { actions, queries, scanner } = await loadTestModules();
+    const sourcePath = path.join(
+      process.env.LIBRARY_PATH!,
+      "uploads",
+      "pasted",
+      "covered.md",
+    );
+    const coverPath = path.join(
+      process.env.LIBRARY_PATH!,
+      "uploads",
+      "pasted",
+      "covered.cover.jpg",
+    );
+    fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+    fs.writeFileSync(sourcePath, "# Covered");
+    fs.writeFileSync(coverPath, Buffer.from([0xff, 0xd8, 0xff, 0xd9, 0x00, 0x01]));
+    writeSidecar(sourcePath, { title: "Covered", origin: "paste" }, { cover: true });
+    await scanner.scanLibrary();
+
+    const document = queries.getDocumentByPath("uploads/pasted/covered.md");
+    actions.deleteDocument(document!.id);
+
+    expect(fs.existsSync(sourcePath)).toBe(false);
+    expect(fs.existsSync(coverPath)).toBe(false);
+  });
 });

@@ -35,6 +35,7 @@ function doc(partial: Partial<DocumentRecord> & Pick<DocumentRecord, "id" | "tit
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-02T00:00:00.000Z",
     absent: false,
+    hasCover: false,
     ...partial,
   };
 }

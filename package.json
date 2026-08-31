@@ -1,6 +1,6 @@
 {
   "name": "text-jellyfin",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "main": "desktop/main.cjs",
   "repository": {
@@ -14,6 +14,7 @@
     "lint": "next lint",
     "scan": "tsx scripts/scan.ts",
     "fixtures": "tsx scripts/generate-fixtures.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "desktop": "electron .",

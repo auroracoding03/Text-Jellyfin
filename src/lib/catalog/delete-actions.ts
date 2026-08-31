@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "@/lib/config";
 import { deleteDocumentRecord, getDocumentById } from "@/lib/catalog/queries";
+import { deleteCoverFile } from "@/lib/catalog/cover";
 import { sidecarPathFor } from "@/lib/ingest/metadata";
 import { deleteNoteAssetsDir } from "@/lib/notes/assets";
 import { assertRealPathWithinRoot, assertWithinRoot } from "@/lib/security/paths";
@@ -25,6 +26,12 @@ export function deleteDocument(id: string): { relativePath: string } {
     throw new DocumentDeleteError("Invalid sidecar path.");
   }
   if (fs.existsSync(sidecarPath)) fs.unlinkSync(sidecarPath);
+
+  try {
+    deleteCoverFile(absolutePath);
+  } catch {
+    // Best effort: the source file is already gone.
+  }
 
   try {
     deleteNoteAssetsDir(absolutePath);

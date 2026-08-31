@@ -36,6 +36,7 @@ export interface DocumentRecord {
   createdAt: string;
   updatedAt: string;
   absent: boolean;
+  hasCover: boolean;
 }
 
 export interface DocumentFilters {

@@ -1,7 +1,12 @@
 import Link from "next/link";
+import { documentCoverSrc } from "@/lib/catalog/cover-url";
 import type { DocumentRecord } from "@/lib/catalog/types";
 import { chapterDisplayNumber } from "@/lib/catalog/series";
 import { StatusBadge } from "@/components/StatusBadge";
+
+function seriesCoverChapter(chapters: DocumentRecord[]): DocumentRecord | null {
+  return chapters.find((chapter) => chapter.hasCover) || null;
+}
 
 export function SeriesCard({
   series,
@@ -11,6 +16,7 @@ export function SeriesCard({
   chapters: DocumentRecord[];
 }) {
   const first = chapters[0];
+  const coverChapter = seriesCoverChapter(chapters);
   const totalMinutes = chapters.reduce(
     (sum, chapter) => sum + (chapter.readingTimeMinutes || 0),
     0,
@@ -22,9 +28,19 @@ export function SeriesCard({
 
   return (
     <div className="feed-item feed-series">
-      <div className="feed-icon" aria-hidden="true">
-        ≡
-      </div>
+      {coverChapter ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          className="feed-cover"
+          src={documentCoverSrc(coverChapter)}
+          alt=""
+          loading="lazy"
+        />
+      ) : (
+        <div className="feed-icon" aria-hidden="true">
+          ≡
+        </div>
+      )}
       <div className="feed-copy">
         <p className="feed-kicker">Series</p>
         <h2>{series}</h2>

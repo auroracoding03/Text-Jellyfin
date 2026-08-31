@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "@/lib/config";
 import { getDocumentByPath, listDocumentsBySeries } from "@/lib/catalog/queries";
+import { CoverImageError, persistCover, deleteCoverFile } from "@/lib/catalog/cover";
 import { resolveChapterNumber } from "@/lib/catalog/series";
 import { scanLibrary } from "@/lib/ingest/scanner";
 import { writeSidecar } from "@/lib/ingest/metadata";
@@ -154,6 +155,7 @@ function writeUploadMetadata(
     chapter?: number;
     tags?: string[];
     origin: "paste" | "file";
+    hasCover?: boolean;
   },
 ): void {
   const title = input.title?.trim() || undefined;
@@ -161,15 +163,19 @@ function writeUploadMetadata(
   const author = normalizeAuthor(input.author);
   const series = normalizeSeries(input.series);
   const tags = input.tags?.map((tag) => tag.trim()).filter(Boolean);
-  writeSidecar(absolutePath, {
-    title,
-    summary,
-    author,
-    series,
-    chapter: input.chapter,
-    tags,
-    origin: input.origin,
-  });
+  writeSidecar(
+    absolutePath,
+    {
+      title,
+      summary,
+      author,
+      series,
+      chapter: input.chapter,
+      tags,
+      origin: input.origin,
+    },
+    { cover: Boolean(input.hasCover) },
+  );
 }
 
 async function indexUpload(absolutePath: string) {
@@ -205,6 +211,18 @@ function saveNoteImages(
   }
 }
 
+function saveCover(absolutePath: string, cover: Buffer | undefined) {
+  if (!cover?.length) return;
+  try {
+    persistCover(absolutePath, cover);
+  } catch (error) {
+    if (error instanceof CoverImageError) {
+      throw new UploadError(error.message, error.status);
+    }
+    throw error;
+  }
+}
+
 export async function uploadText(input: {
   title: string;
   format: string;
@@ -215,6 +233,7 @@ export async function uploadText(input: {
   chapter?: string | number;
   tags?: string[];
   images?: NoteImageInput[];
+  cover?: Buffer;
 }) {
   const format = normalizeFormat(input.format);
   const title = input.title.trim();
@@ -235,7 +254,9 @@ export async function uploadText(input: {
       chapter,
       tags: input.tags,
       origin: "paste",
+      hasCover: Boolean(input.cover?.length),
     });
+    saveCover(absolutePath, input.cover);
     if (format === "md") {
       saveNoteImages(absolutePath, input.text, input.images, false);
     }
@@ -247,6 +268,11 @@ export async function uploadText(input: {
       deleteNoteAssetsDir(absolutePath);
     } catch {
       // Best effort; the note file is already removed.
+    }
+    try {
+      deleteCoverFile(absolutePath);
+    } catch {
+      // Best effort cleanup.
     }
     throw error;
   }
@@ -262,6 +288,7 @@ export async function uploadFile(input: {
   series?: string;
   chapter?: string | number;
   tags?: string[];
+  cover?: Buffer;
 }) {
   const extension = path.extname(input.filename).toLowerCase();
   const format = normalizeFormat(extension.slice(1));
@@ -282,6 +309,8 @@ export async function uploadFile(input: {
     chapter,
     tags: input.tags,
     origin: "file",
+    hasCover: Boolean(input.cover?.length),
   });
+  saveCover(absolutePath, input.cover);
   return indexUpload(absolutePath);
 }

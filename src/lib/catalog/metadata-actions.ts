@@ -1,5 +1,10 @@
 import path from "node:path";
 import { config } from "@/lib/config";
+import {
+  CoverImageError,
+  deleteCoverFile,
+  persistCover,
+} from "@/lib/catalog/cover";
 import { getDocumentById } from "@/lib/catalog/queries";
 import { readSidecar, writeSidecar } from "@/lib/ingest/metadata";
 import { assertWithinRoot } from "@/lib/security/paths";
@@ -16,6 +21,7 @@ export async function updateDocumentMetadata(
     language: string;
     tags: string[];
   }>,
+  cover?: Buffer | null | "clear",
 ) {
   const document = getDocumentById(id);
   if (!document) {
@@ -39,6 +45,22 @@ export async function updateDocumentMetadata(
     chapter = Math.floor(input.chapter);
   }
 
+  const nextCover =
+    cover === "clear" ? false : Buffer.isBuffer(cover) ? true : existing.hasCover;
+
+  if (Buffer.isBuffer(cover)) {
+    try {
+      persistCover(absolutePath, cover);
+    } catch (error) {
+      if (error instanceof CoverImageError) {
+        throw new Error(error.message);
+      }
+      throw error;
+    }
+  } else if (cover === "clear") {
+    deleteCoverFile(absolutePath);
+  }
+
   writeSidecar(absolutePath, {
     title: input.title === undefined ? document.title : input.title.trim() || undefined,
     summary:
@@ -50,6 +72,8 @@ export async function updateDocumentMetadata(
       input.language === undefined ? document.language || undefined : input.language.trim() || undefined,
     tags: input.tags === undefined ? document.tags : input.tags,
     origin: existing.metadata.origin,
+  }, {
+    cover: nextCover,
   });
 
   // Re-scan so catalog and cache key stay aligned with sidecar hash.

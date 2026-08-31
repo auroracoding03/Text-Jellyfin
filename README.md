@@ -126,11 +126,13 @@ npm run build:desktop
 
 The resulting `dist/Text Jellyfin Setup <version>.exe` is the one-click
 per-user installer. It adds a Start Menu and Desktop shortcut, uses the ink
-quill icon, and starts the application after installation. The Settings page
-lets each user enable or disable launch at Windows sign-in and optionally
-**start in the system tray** (no taskbar window). Closing or minimizing the
-window hides the app to the tray while the local server keeps running for LAN
-access; Quit from the tray menu stops it.
+quill icon, and starts the application after installation. By default the app
+runs in the **system tray** with the local server already up (no library window
+until you open it from the tray). Settings lets you enable launch at Windows
+sign-in and optionally open the library window at startup. Closing or minimizing
+the window hides it to the tray while the server keeps running for LAN access;
+**Quit and stop server** from the tray menu is the only way to shut the server
+down. This is a tray-hosted desktop app, not a separate Windows Service.
 
 ### Release updates
 

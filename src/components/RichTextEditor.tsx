@@ -18,6 +18,16 @@ import {
   CLIENT_MAX_NOTE_IMAGES,
   compressImage,
 } from "@/lib/notes/compress-image";
+import {
+  normalizePastedHtml,
+  normalizePastedText,
+} from "@/lib/notes/normalize-pasted-text";
+import {
+  classifyClipboardDataTransfer,
+  imageFilesFromDataTransfer,
+  noteImgPlaceholder,
+  prepareMixedPaste,
+} from "@/lib/notes/paste-images";
 
 const turndown = new TurndownService({
   headingStyle: "atx",
@@ -85,6 +95,13 @@ function escapeAttr(value: string): string {
     .replace(/</g, "&lt;");
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -92,24 +109,6 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(new Error("Could not read this image."));
     reader.readAsDataURL(file);
   });
-}
-
-function imageFilesFromDataTransfer(
-  data: DataTransfer | null | undefined,
-): File[] {
-  if (!data) return [];
-  const fromFiles = Array.from(data.files || []).filter((file) =>
-    file.type.startsWith("image/"),
-  );
-  if (fromFiles.length) return fromFiles;
-  const fromItems: File[] = [];
-  for (const item of Array.from(data.items || [])) {
-    if (item.kind === "file" && item.type.startsWith("image/")) {
-      const file = item.getAsFile();
-      if (file) fromItems.push(file);
-    }
-  }
-  return fromItems;
 }
 
 function newAssetFilename(): string {
@@ -183,6 +182,9 @@ export function RichTextEditor({
   maxImagesRef.current = maxNoteImages;
   maxBytesRef.current = maxNoteImageBytes;
   const insertImagesRef = useRef<(files: File[]) => Promise<void>>(async () => {});
+  const handleMixedPasteRef = useRef<(clipboard: DataTransfer) => Promise<void>>(
+    async () => {},
+  );
 
   function emitPending() {
     onPendingRef.current?.(
@@ -246,12 +248,27 @@ export function RichTextEditor({
         class: "rich-text-prose",
         ...(id ? { id } : {}),
       },
+      transformPastedText(text) {
+        return normalizePastedText(text);
+      },
+      transformPastedHTML(html) {
+        return normalizePastedHtml(html);
+      },
       handlePaste(_view, event) {
-        const files = imageFilesFromDataTransfer(event.clipboardData);
-        if (!files.length) return false;
-        event.preventDefault();
-        void insertImagesRef.current(files);
-        return true;
+        const clipboard = event.clipboardData;
+        if (!clipboard) return false;
+        const kind = classifyClipboardDataTransfer(clipboard);
+        if (kind === "image-only") {
+          event.preventDefault();
+          void insertImagesRef.current(imageFilesFromDataTransfer(clipboard));
+          return true;
+        }
+        if (kind === "mixed") {
+          event.preventDefault();
+          void handleMixedPasteRef.current(clipboard);
+          return true;
+        }
+        return false;
       },
       handleDrop(_view, event) {
         const files = imageFilesFromDataTransfer(event.dataTransfer);
@@ -269,6 +286,21 @@ export function RichTextEditor({
     },
   });
 
+  async function attachCompressedImage(file: File, alt: string): Promise<string> {
+    const compressed = await compressImage(file, {
+      maxBytes: maxBytesRef.current,
+    });
+    const filename = newAssetFilename();
+    const previewUrl = await fileToDataUrl(compressed);
+    const asset = noteAssetMarkdownSrc(filename);
+    pendingRef.current.set(filename, {
+      filename,
+      file: compressed,
+      previewUrl,
+    });
+    return `<img src="${previewUrl}" alt="${escapeAttr(alt)}" data-asset="${escapeAttr(asset)}">`;
+  }
+
   insertImagesRef.current = async (files: File[]) => {
     if (!editor) return;
     const markdown = htmlToMarkdown(editor.getHTML());
@@ -282,25 +314,9 @@ export function RichTextEditor({
 
     for (const file of files) {
       try {
-        const compressed = await compressImage(file);
-        if (compressed.size > maxBytesRef.current) {
-          onErrorRef.current?.(
-            `Each image must be ${Math.ceil(maxBytesRef.current / 1024)} KB or smaller after compression.`,
-          );
-          continue;
-        }
-        const filename = newAssetFilename();
-        const previewUrl = await fileToDataUrl(compressed);
-        const asset = noteAssetMarkdownSrc(filename);
-        pendingRef.current.set(filename, {
-          filename,
-          file: compressed,
-          previewUrl,
-        });
         const alt = file.name.replace(/\.[^.]+$/, "") || "pasted image";
-        editor.chain().focus().insertContent(
-          `<img src="${previewUrl}" alt="${escapeAttr(alt)}" data-asset="${escapeAttr(asset)}">`,
-        ).run();
+        const imgHtml = await attachCompressedImage(file, alt);
+        editor.chain().focus().insertContent(imgHtml).run();
       } catch (error) {
         onErrorRef.current?.(
           error instanceof Error ? error.message : "Could not insert this image.",
@@ -308,6 +324,49 @@ export function RichTextEditor({
       }
     }
     emitPending();
+  };
+
+  handleMixedPasteRef.current = async (clipboard: DataTransfer) => {
+    if (!editor) return;
+    const html = normalizePastedHtml(clipboard.getData("text/html")?.trim() || "");
+    const plain = normalizePastedText(clipboard.getData("text/plain")?.trim() || "");
+    const sourceHtml = html || (plain ? `<p>${escapeHtml(plain)}</p>` : "");
+    if (!sourceHtml) return;
+
+    const prepared = await prepareMixedPaste(
+      sourceHtml,
+      imageFilesFromDataTransfer(clipboard),
+    );
+    const markdown = htmlToMarkdown(editor.getHTML());
+    const existing = listNoteAssetFilenames(markdown).length;
+    if (existing + prepared.pending.length > maxImagesRef.current) {
+      onErrorRef.current?.(
+        `Notes can include at most ${maxImagesRef.current} images.`,
+      );
+      return;
+    }
+
+    let finalHtml = prepared.html;
+    for (const item of prepared.pending) {
+      try {
+        const file = await item.source;
+        const imgHtml = await attachCompressedImage(file, item.alt);
+        finalHtml = finalHtml.replace(noteImgPlaceholder(item.index), imgHtml);
+      } catch (error) {
+        finalHtml = finalHtml.replace(noteImgPlaceholder(item.index), "");
+        onErrorRef.current?.(
+          error instanceof Error ? error.message : "Could not insert this image.",
+        );
+      }
+    }
+
+    editor.chain().focus().insertContent(finalHtml).run();
+    emitPending();
+    if (prepared.skippedImages > 0) {
+      onErrorRef.current?.(
+        "Some images could not be attached. Use the Image button for those.",
+      );
+    }
   };
 
   useEffect(() => {

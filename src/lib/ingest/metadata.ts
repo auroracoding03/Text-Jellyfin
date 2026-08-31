@@ -3,6 +3,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import YAML from "yaml";
 import type { ExtractedMetadata } from "@/lib/ingest/types";
+import { coverExistsFor } from "@/lib/catalog/cover";
 
 export function sidecarPathFor(sourcePath: string): string {
   return `${sourcePath}.meta.yaml`;
@@ -28,10 +29,16 @@ export function readSidecar(sourcePath: string): {
   metadata: ExtractedMetadata;
   hash: string | null;
   exists: boolean;
+  hasCover: boolean;
 } {
   const sidecar = sidecarPathFor(sourcePath);
   if (!fs.existsSync(sidecar)) {
-    return { metadata: {}, hash: null, exists: false };
+    return {
+      metadata: {},
+      hash: null,
+      exists: false,
+      hasCover: coverExistsFor(sourcePath),
+    };
   }
 
   const raw = fs.readFileSync(sidecar, "utf8");
@@ -57,17 +64,24 @@ export function readSidecar(sourcePath: string): {
         : undefined,
   };
 
+  const hasCover = coverExistsFor(sourcePath);
+
   return {
     metadata,
     hash: hashString(raw),
     exists: true,
+    hasCover,
   };
 }
 
 export function writeSidecar(
   sourcePath: string,
   metadata: ExtractedMetadata,
+  options?: { cover?: boolean },
 ): void {
+  const existing = readSidecar(sourcePath);
+  const cover =
+    options?.cover === undefined ? existing.hasCover : Boolean(options.cover);
   const payload = {
     title: metadata.title || undefined,
     summary: metadata.summary || undefined,
@@ -77,6 +91,7 @@ export function writeSidecar(
     language: metadata.language || undefined,
     tags: metadata.tags?.length ? metadata.tags : undefined,
     origin: metadata.origin || undefined,
+    cover: cover || undefined,
   };
 
   fs.writeFileSync(sidecarPathFor(sourcePath), YAML.stringify(payload), "utf8");

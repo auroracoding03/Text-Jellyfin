@@ -10,9 +10,11 @@ const path = require("node:path");
 const APP_NAME = "Text Jellyfin";
 const UPDATE_STATUS_EVENT = "text-jellyfin:update-status";
 const DEFAULT_PORT = Number(process.env.TEXT_JELLYFIN_PORT || process.env.PORT || 3000);
+const PREFERENCES_VERSION = 2;
 const DEFAULT_PREFERENCES = {
   launchAtStartup: true,
-  startInTray: false,
+  startInTray: true,
+  prefsVersion: PREFERENCES_VERSION,
 };
 
 let mainWindow;
@@ -36,7 +38,15 @@ function preferencesPath() {
 
 function readPreferences() {
   try {
-    return { ...DEFAULT_PREFERENCES, ...JSON.parse(fs.readFileSync(preferencesPath(), "utf8")) };
+    const stored = JSON.parse(fs.readFileSync(preferencesPath(), "utf8"));
+    const preferences = { ...DEFAULT_PREFERENCES, ...stored };
+    if (!stored.prefsVersion || stored.prefsVersion < PREFERENCES_VERSION) {
+      preferences.startInTray = true;
+      preferences.prefsVersion = PREFERENCES_VERSION;
+      writePreferences(preferences);
+      applyLoginItemSettings(preferences);
+    }
+    return preferences;
   } catch {
     return { ...DEFAULT_PREFERENCES };
   }
@@ -64,7 +74,11 @@ function setLaunchAtStartup(enabled) {
 }
 
 function setStartInTray(enabled) {
-  const preferences = { ...readPreferences(), startInTray: Boolean(enabled) };
+  const preferences = {
+    ...readPreferences(),
+    startInTray: Boolean(enabled),
+    prefsVersion: PREFERENCES_VERSION,
+  };
   writePreferences(preferences);
   applyLoginItemSettings(preferences);
   return preferences.startInTray;
@@ -378,7 +392,7 @@ function rebuildTrayMenu() {
     },
     { type: "separator" },
     {
-      label: "Quit",
+      label: "Quit and stop server",
       click: () => quitApplication(),
     },
   ]);
@@ -387,7 +401,7 @@ function rebuildTrayMenu() {
 
 function createTray() {
   tray = new Tray(createTrayIcon());
-  tray.setToolTip(`${APP_NAME} is running`);
+  tray.setToolTip(`${APP_NAME} is running in the background`);
   tray.on("double-click", () => showMainWindow());
   tray.on("click", () => {
     if (process.platform === "win32") showMainWindow();
@@ -543,7 +557,11 @@ function registerIpcHandlers() {
 
 app.whenReady().then(async () => {
   app.setAppUserModelId("com.textjellyfin.app");
-  applyLoginItemSettings(readPreferences());
+  const preferences = readPreferences();
+  applyLoginItemSettings(preferences);
+  if (!fs.existsSync(preferencesPath())) {
+    writePreferences(preferences);
+  }
   configureUpdateEvents();
   installDesktopAuthHelpers();
   registerIpcHandlers();

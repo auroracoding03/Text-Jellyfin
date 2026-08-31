@@ -14,6 +14,11 @@ const RichTextEditor = dynamic(
   },
 );
 
+const CoverImagePicker = dynamic(
+  () => import("@/components/CoverImagePicker").then((mod) => mod.CoverImagePicker),
+  { ssr: false },
+);
+
 type UploadMode = "file" | "text";
 
 type UploadResponse = {
@@ -46,6 +51,7 @@ export function UploadForm({
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [pendingImages, setPendingImages] = useState<PendingNoteImage[]>([]);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<UploadResponse | null>(null);
@@ -95,6 +101,9 @@ export function UploadForm({
         }
       }
     }
+    if (coverFile) {
+      body.append("cover", coverFile, coverFile.name);
+    }
 
     setPending(true);
     try {
@@ -113,6 +122,7 @@ export function UploadForm({
       setTags("");
       setText("");
       setPendingImages([]);
+      setCoverFile(null);
       setFile(null);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
@@ -217,6 +227,18 @@ export function UploadForm({
           placeholder="notes, reading, personal"
         />
       </div>
+
+      <CoverImagePicker
+        maxBytes={maxNoteImageBytes}
+        selectionState={coverFile ? "pending" : "none"}
+        statusMessage={
+          coverFile
+            ? "Cover attached. It will upload when you add this record to the library."
+            : null
+        }
+        onChange={(next) => setCoverFile(next === "clear" ? null : next)}
+        onError={setError}
+      />
 
       {mode === "file" ? (
         <div id="upload-file-panel" className="field upload-panel" role="tabpanel">

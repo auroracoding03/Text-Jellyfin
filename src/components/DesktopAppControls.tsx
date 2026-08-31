@@ -50,6 +50,8 @@ export function DesktopAppControls() {
     setStartInTray(await window.textJellyfinDesktop!.setStartInTray(enabled));
   };
 
+  const showWindowAtStartup = !startInTray;
+
   const updateAction = async () => {
     const desktop = window.textJellyfinDesktop!;
     if (update.status === "available") {
@@ -160,15 +162,16 @@ export function DesktopAppControls() {
           </label>
           <label className="desktop-toggle" style={{ marginTop: "0.85rem" }}>
             <input
-              checked={startInTray}
-              onChange={(event) => void changeStartInTray(event.target.checked)}
+              checked={showWindowAtStartup}
+              onChange={(event) => void changeStartInTray(!event.target.checked)}
               type="checkbox"
             />
-            <span>Start in the system tray (no taskbar window)</span>
+            <span>Open the library window when Text Jellyfin starts</span>
           </label>
           <p style={{ color: "var(--muted)", margin: "0.75rem 0 0", fontSize: "0.9rem" }}>
-            Closing or minimizing the window hides it to the tray. Use the tray icon to open the
-            library again, or choose Quit to stop the server.
+            Text Jellyfin starts in the system tray with the library server running. Closing or
+            minimizing the window does not stop the server — phones can still use the LAN URLs
+            above. Use <strong>Quit and stop server</strong> in the tray menu to shut it down.
           </p>
         </div>
       ) : null}

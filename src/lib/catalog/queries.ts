@@ -36,6 +36,7 @@ type DocumentRow = {
   created_at: string;
   updated_at: string;
   absent: number;
+  has_cover: number;
 };
 
 function mapDocument(row: DocumentRow, tags: string[]): DocumentRecord {
@@ -67,6 +68,7 @@ function mapDocument(row: DocumentRow, tags: string[]): DocumentRecord {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     absent: Boolean(row.absent),
+    hasCover: Boolean(row.has_cover),
   };
 }
 
@@ -254,7 +256,7 @@ export function upsertDocument(input: UpsertDocumentInput): "added" | "updated" 
           chapter = ?, language = ?, file_size = ?, mtime_ms = ?, content_hash = ?, sidecar_hash = ?,
           cache_key = ?, article_html_path = ?, plain_text = ?, word_count = ?,
           reading_time_minutes = ?, adapter_name = ?, adapter_version = ?, status = ?,
-          warnings_json = ?, indexed_at = ?, updated_at = ?, absent = ?
+          warnings_json = ?, indexed_at = ?, updated_at = ?, absent = ?, has_cover = ?
          WHERE id = ?`,
       ).run(
         input.relativePath,
@@ -281,6 +283,7 @@ export function upsertDocument(input: UpsertDocumentInput): "added" | "updated" 
         input.indexedAt,
         updatedAt,
         input.absent ? 1 : 0,
+        input.hasCover ? 1 : 0,
         existing.id,
       );
       db.prepare("DELETE FROM document_tags WHERE document_id = ?").run(existing.id);
@@ -291,8 +294,8 @@ export function upsertDocument(input: UpsertDocumentInput): "added" | "updated" 
           id, relative_path, format, title, summary, author, series, chapter, language,
           file_size, mtime_ms, content_hash, sidecar_hash, cache_key, article_html_path,
           plain_text, word_count, reading_time_minutes, adapter_name, adapter_version,
-          status, warnings_json, indexed_at, created_at, updated_at, absent
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          status, warnings_json, indexed_at, created_at, updated_at, absent, has_cover
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         input.id,
         input.relativePath,
@@ -320,6 +323,7 @@ export function upsertDocument(input: UpsertDocumentInput): "added" | "updated" 
         createdAt,
         updatedAt,
         input.absent ? 1 : 0,
+        input.hasCover ? 1 : 0,
       );
     }
 

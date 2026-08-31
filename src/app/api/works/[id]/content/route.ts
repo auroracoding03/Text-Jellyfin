@@ -4,6 +4,10 @@ import {
   updateDocumentContent,
 } from "@/lib/catalog/content-actions";
 import { imagesFromFormData } from "@/lib/notes/assets";
+import {
+  exceedsNotePayloadLimit,
+  notePayloadLimitError,
+} from "@/lib/notes/payload-limits";
 
 export const runtime = "nodejs";
 
@@ -11,6 +15,11 @@ export async function PUT(
   request: Request,
   { params }: { params: { id: string } },
 ) {
+  const contentLength = Number(request.headers.get("content-length") || "0");
+  if (exceedsNotePayloadLimit(contentLength)) {
+    return NextResponse.json({ error: notePayloadLimitError() }, { status: 413 });
+  }
+
   try {
     const contentType = request.headers.get("content-type") || "";
     let content: string;

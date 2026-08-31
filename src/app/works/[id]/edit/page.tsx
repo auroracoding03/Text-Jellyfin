@@ -36,6 +36,8 @@ export default async function EditRecordPage({
       </section>
       <MetadataForm
         id={document.id}
+        hasCover={document.hasCover}
+        coverCacheBuster={`${document.updatedAt}:${document.sidecarHash || ""}`}
         initial={{
           title: document.title,
           summary: document.summary,

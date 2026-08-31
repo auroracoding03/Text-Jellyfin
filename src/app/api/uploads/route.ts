@@ -1,21 +1,19 @@
 import { NextResponse } from "next/server";
-import { config } from "@/lib/config";
 import { imagesFromFormData } from "@/lib/notes/assets";
+import { coverFromFormData } from "@/lib/catalog/cover";
+import {
+  exceedsNotePayloadLimit,
+  notePayloadLimitError,
+} from "@/lib/notes/payload-limits";
 import { UploadError, uploadFile, uploadText } from "@/lib/uploads/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const FORM_OVERHEAD_BYTES = 64 * 1024;
-
 export async function POST(request: Request) {
   const contentLength = Number(request.headers.get("content-length") || "0");
-  const payloadLimit = config.maxNotePayloadBytes + FORM_OVERHEAD_BYTES;
-  if (contentLength > payloadLimit) {
-    return NextResponse.json(
-      { error: `Upload exceeds the ${config.maxNotePayloadBytes} byte upload limit.` },
-      { status: 413 },
-    );
+  if (exceedsNotePayloadLimit(contentLength)) {
+    return NextResponse.json({ error: notePayloadLimitError() }, { status: 413 });
   }
 
   try {
@@ -31,6 +29,8 @@ export async function POST(request: Request) {
       .map((tag) => tag.trim())
       .filter(Boolean);
     const images = await imagesFromFormData(formData);
+    const coverValue = await coverFromFormData(formData);
+    const cover = coverValue && coverValue !== "clear" ? coverValue : undefined;
 
     const result =
       kind === "text"
@@ -44,6 +44,7 @@ export async function POST(request: Request) {
             chapter,
             tags,
             images,
+            cover,
           })
         : await uploadFromFile(
             formData.get("file"),
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
             series,
             chapter,
             tags,
+            cover,
           );
 
     return NextResponse.json(result, { status: 201 });
@@ -76,6 +78,7 @@ async function uploadFromFile(
   series: string,
   chapter: string,
   tags: string[],
+  cover?: Buffer,
 ) {
   if (!value || typeof value === "string" || typeof value.arrayBuffer !== "function") {
     throw new UploadError("Choose a Markdown or plain-text file to upload.");
@@ -93,5 +96,6 @@ async function uploadFromFile(
     series,
     chapter,
     tags,
+    cover,
   });
 }

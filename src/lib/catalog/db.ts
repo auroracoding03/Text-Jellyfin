@@ -84,6 +84,9 @@ function migrateDocumentsSchema(db: Database.Database): void {
   if (!columns.some((column) => column.name === "chapter")) {
     db.exec("ALTER TABLE documents ADD COLUMN chapter INTEGER");
   }
+  if (!columns.some((column) => column.name === "has_cover")) {
+    db.exec("ALTER TABLE documents ADD COLUMN has_cover INTEGER NOT NULL DEFAULT 0");
+  }
 }
 
 export function getDb(): Database.Database {

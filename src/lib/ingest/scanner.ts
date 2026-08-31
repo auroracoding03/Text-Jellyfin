@@ -13,6 +13,7 @@ import type { DocumentFormat, ScanRunSummary } from "@/lib/catalog/types";
 import { formatFromExtension, getAdapter } from "@/lib/ingest/adapters";
 import { buildCacheKey, writeArticleCache } from "@/lib/ingest/cache";
 import { mergeMetadata, readSidecar } from "@/lib/ingest/metadata";
+import { coverExistsFor, coverMtimeMs } from "@/lib/catalog/cover";
 import { assertWithinRoot, ensureDir, toPosixRelative } from "@/lib/security/paths";
 
 const SUPPORTED_EXTENSIONS = new Set([".md", ".markdown", ".txt", ".docx", ".pdf"]);
@@ -60,6 +61,7 @@ function walkLibrary(root: string): string[] {
       }
       if (!entry.isFile()) continue;
       if (entry.name.endsWith(".meta.yaml")) continue;
+      if (entry.name.endsWith(".cover.jpg")) continue;
       const ext = path.extname(entry.name).toLowerCase();
       if (!SUPPORTED_EXTENSIONS.has(ext)) continue;
       results.push(absolute);
@@ -90,6 +92,19 @@ async function withTimeout<T>(
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+function coverUnchanged(
+  existingHasCover: boolean,
+  sidecarHasCover: boolean,
+  sourcePath: string,
+  indexedAt: string | null,
+): boolean {
+  if (existingHasCover !== sidecarHasCover) return false;
+  if (!sidecarHasCover) return true;
+  const indexedMs = indexedAt ? Date.parse(indexedAt) : 0;
+  if (!Number.isFinite(indexedMs)) return false;
+  return coverMtimeMs(sourcePath) <= indexedMs;
 }
 
 let activeScan: Promise<ScanResult> | null = null;
@@ -155,6 +170,7 @@ async function scanLibraryInternal(): Promise<ScanResult> {
           warnings: [`File exceeds max size of ${config.maxFileBytes} bytes.`],
           indexedAt: new Date().toISOString(),
           absent: false,
+          hasCover: coverExistsFor(safePath),
           });
           continue;
         }
@@ -192,6 +208,7 @@ async function scanLibraryInternal(): Promise<ScanResult> {
           warnings: [`Unsupported format: ${format}`],
           indexedAt: new Date().toISOString(),
           absent: false,
+          hasCover: sidecar.hasCover,
           });
           failed += 1;
           continue;
@@ -203,6 +220,7 @@ async function scanLibraryInternal(): Promise<ScanResult> {
           existing.fileSize === stat.size &&
           existing.mtimeMs === stat.mtimeMs &&
           existing.sidecarHash === sidecar.hash &&
+          coverUnchanged(existing.hasCover, sidecar.hasCover, safePath, existing.updatedAt) &&
           existing.adapterName === adapter.name &&
           existing.adapterVersion === adapter.version &&
           existing.articleHtmlPath &&
@@ -226,6 +244,7 @@ async function scanLibraryInternal(): Promise<ScanResult> {
           !existing.absent &&
           existing.contentHash === contentHash &&
           existing.sidecarHash === sidecar.hash &&
+          coverUnchanged(existing.hasCover, sidecar.hasCover, safePath, existing.updatedAt) &&
           existing.cacheKey === cacheKey &&
           existing.articleHtmlPath &&
           fs.existsSync(existing.articleHtmlPath)
@@ -306,6 +325,7 @@ async function scanLibraryInternal(): Promise<ScanResult> {
         warnings: extracted.warnings,
         indexedAt: new Date().toISOString(),
         absent: false,
+        hasCover: sidecar.hasCover,
         createdAt: existing?.createdAt,
       });
 
@@ -343,6 +363,7 @@ async function scanLibraryInternal(): Promise<ScanResult> {
         warnings: [message],
         indexedAt: new Date().toISOString(),
         absent: false,
+        hasCover: coverExistsFor(absolutePath),
         });
       }
     }
