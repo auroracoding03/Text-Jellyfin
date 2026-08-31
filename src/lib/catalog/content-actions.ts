@@ -6,9 +6,21 @@ import { getDocumentById } from "@/lib/catalog/queries";
 import type { DocumentRecord } from "@/lib/catalog/types";
 import { readSidecar } from "@/lib/ingest/metadata";
 import { scanLibrary } from "@/lib/ingest/scanner";
+import {
+  NoteAssetError,
+  persistNoteAssets,
+  type NoteImageInput,
+} from "@/lib/notes/assets";
 import { assertRealPathWithinRoot } from "@/lib/security/paths";
 
-export class ContentEditError extends Error {}
+export class ContentEditError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number = 400,
+  ) {
+    super(message);
+  }
+}
 
 export function canEditFormat(format: string): boolean {
   return format === "md" || format === "txt";
@@ -68,15 +80,19 @@ export function readEditableSource(id: string): string {
   return fs.readFileSync(absolutePath, "utf8");
 }
 
-export async function updateDocumentContent(id: string, content: string): Promise<void> {
+export async function updateDocumentContent(
+  id: string,
+  content: string,
+  images: NoteImageInput[] = [],
+): Promise<void> {
   if (typeof content !== "string" || !content.trim()) {
     throw new ContentEditError("Article text cannot be empty.");
   }
   if (Buffer.byteLength(content, "utf8") > config.maxUploadBytes) {
-    throw new ContentEditError("Article text exceeds the configured upload limit.");
+    throw new ContentEditError("Article text exceeds the configured upload limit.", 413);
   }
 
-  const { absolutePath } = editableSource(id);
+  const { document, absolutePath } = editableSource(id);
   const tempPath = `${absolutePath}.${randomUUID()}.tmp`;
   try {
     fs.writeFileSync(tempPath, content, "utf8");
@@ -84,5 +100,24 @@ export async function updateDocumentContent(id: string, content: string): Promis
   } finally {
     if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
   }
+
+  if (document.format === "md") {
+    try {
+      persistNoteAssets({
+        markdownPath: absolutePath,
+        markdown: content,
+        images,
+        prune: true,
+      });
+    } catch (error) {
+      if (error instanceof NoteAssetError) {
+        throw new ContentEditError(error.message, error.status);
+      }
+      throw error;
+    }
+  } else if (images.length) {
+    throw new ContentEditError("Images can only be attached to Markdown notes.");
+  }
+
   await scanLibrary();
 }

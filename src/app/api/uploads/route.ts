@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { config } from "@/lib/config";
+import { imagesFromFormData } from "@/lib/notes/assets";
 import { UploadError, uploadFile, uploadText } from "@/lib/uploads/service";
 
 export const runtime = "nodejs";
@@ -9,9 +10,10 @@ const FORM_OVERHEAD_BYTES = 64 * 1024;
 
 export async function POST(request: Request) {
   const contentLength = Number(request.headers.get("content-length") || "0");
-  if (contentLength > config.maxUploadBytes + FORM_OVERHEAD_BYTES) {
+  const payloadLimit = config.maxNotePayloadBytes + FORM_OVERHEAD_BYTES;
+  if (contentLength > payloadLimit) {
     return NextResponse.json(
-      { error: `Upload exceeds the ${config.maxUploadBytes} byte upload limit.` },
+      { error: `Upload exceeds the ${config.maxNotePayloadBytes} byte upload limit.` },
       { status: 413 },
     );
   }
@@ -28,6 +30,7 @@ export async function POST(request: Request) {
       .split(",")
       .map((tag) => tag.trim())
       .filter(Boolean);
+    const images = await imagesFromFormData(formData);
 
     const result =
       kind === "text"
@@ -40,6 +43,7 @@ export async function POST(request: Request) {
             series,
             chapter,
             tags,
+            images,
           })
         : await uploadFromFile(
             formData.get("file"),

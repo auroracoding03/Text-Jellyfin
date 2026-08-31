@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { ContentEditError, updateDocumentContent } from "@/lib/catalog/content-actions";
+import {
+  ContentEditError,
+  updateDocumentContent,
+} from "@/lib/catalog/content-actions";
+import { imagesFromFormData } from "@/lib/notes/assets";
 
 export const runtime = "nodejs";
 
@@ -8,16 +12,32 @@ export async function PUT(
   { params }: { params: { id: string } },
 ) {
   try {
-    const body = await request.json();
-    if (typeof body.content !== "string") {
+    const contentType = request.headers.get("content-type") || "";
+    let content: string;
+    let images = [] as Awaited<ReturnType<typeof imagesFromFormData>>;
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      content = String(formData.get("content") || "");
+      images = await imagesFromFormData(formData);
+    } else {
+      const body = await request.json();
+      if (typeof body.content !== "string") {
+        return NextResponse.json({ error: "Article text is required." }, { status: 400 });
+      }
+      content = body.content;
+    }
+
+    if (typeof content !== "string") {
       return NextResponse.json({ error: "Article text is required." }, { status: 400 });
     }
-    await updateDocumentContent(params.id, body.content);
+
+    await updateDocumentContent(params.id, content, images);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to update article text." },
-      { status: error instanceof ContentEditError ? 400 : 500 },
+      { status: error instanceof ContentEditError ? error.status : 500 },
     );
   }
 }

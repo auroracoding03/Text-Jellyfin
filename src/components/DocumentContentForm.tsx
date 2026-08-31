@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import type { PendingNoteImage } from "@/components/RichTextEditor";
 
 const RichTextEditor = dynamic(
   () => import("@/components/RichTextEditor").then((mod) => mod.RichTextEditor),
@@ -16,13 +17,18 @@ export function DocumentContentForm({
   id,
   initialContent,
   format = "md",
+  maxNoteImages = 15,
+  maxNoteImageBytes = 1024 * 1024,
 }: {
   id: string;
   initialContent: string;
   format?: "md" | "txt" | string;
+  maxNoteImages?: number;
+  maxNoteImageBytes?: number;
 }) {
   const router = useRouter();
   const [content, setContent] = useState(initialContent);
+  const [pendingImages, setPendingImages] = useState<PendingNoteImage[]>([]);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const rich = format === "md";
@@ -35,10 +41,14 @@ export function DocumentContentForm({
       return;
     }
     try {
+      const body = new FormData();
+      body.set("content", content);
+      for (const image of pendingImages) {
+        body.append("images", image.file, image.filename);
+      }
       const response = await fetch(`/api/works/${id}/content`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body,
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Failed to save article text.");
@@ -60,6 +70,11 @@ export function DocumentContentForm({
             id="article-content"
             value={content}
             onChange={setContent}
+            onPendingImagesChange={setPendingImages}
+            onError={setError}
+            documentId={id}
+            maxNoteImages={maxNoteImages}
+            maxNoteImageBytes={maxNoteImageBytes}
             placeholder="Edit your note…"
             minHeight="24rem"
           />

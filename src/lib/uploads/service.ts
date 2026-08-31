@@ -5,6 +5,12 @@ import { getDocumentByPath, listDocumentsBySeries } from "@/lib/catalog/queries"
 import { resolveChapterNumber } from "@/lib/catalog/series";
 import { scanLibrary } from "@/lib/ingest/scanner";
 import { writeSidecar } from "@/lib/ingest/metadata";
+import {
+  NoteAssetError,
+  deleteNoteAssetsDir,
+  persistNoteAssets,
+  type NoteImageInput,
+} from "@/lib/notes/assets";
 import { assertWithinRoot, ensureDir, toPosixRelative } from "@/lib/security/paths";
 
 export type UploadFormat = "md" | "txt";
@@ -177,6 +183,28 @@ async function indexUpload(absolutePath: string) {
   };
 }
 
+function saveNoteImages(
+  absolutePath: string,
+  markdown: string,
+  images: NoteImageInput[] | undefined,
+  prune: boolean,
+) {
+  if (!images?.length && !/note-assets\//.test(markdown)) return;
+  try {
+    persistNoteAssets({
+      markdownPath: absolutePath,
+      markdown,
+      images: images || [],
+      prune,
+    });
+  } catch (error) {
+    if (error instanceof NoteAssetError) {
+      throw new UploadError(error.message, error.status);
+    }
+    throw error;
+  }
+}
+
 export async function uploadText(input: {
   title: string;
   format: string;
@@ -186,23 +214,42 @@ export async function uploadText(input: {
   series?: string;
   chapter?: string | number;
   tags?: string[];
+  images?: NoteImageInput[];
 }) {
   const format = normalizeFormat(input.format);
   const title = input.title.trim();
   if (!title) throw new UploadError("A title is required for pasted text.");
+  if (format !== "md" && input.images?.length) {
+    throw new UploadError("Images can only be attached to Markdown notes.");
+  }
   const author = normalizeAuthor(input.author);
   const series = normalizeSeries(input.series);
   const chapter = resolveUploadChapter({ title, series, chapter: input.chapter });
   const absolutePath = writeUpload(title, format, Buffer.from(input.text, "utf8"), "pasted");
-  writeUploadMetadata(absolutePath, {
-    title,
-    summary: input.summary,
-    author,
-    series,
-    chapter,
-    tags: input.tags,
-    origin: "paste",
-  });
+  try {
+    writeUploadMetadata(absolutePath, {
+      title,
+      summary: input.summary,
+      author,
+      series,
+      chapter,
+      tags: input.tags,
+      origin: "paste",
+    });
+    if (format === "md") {
+      saveNoteImages(absolutePath, input.text, input.images, false);
+    }
+  } catch (error) {
+    if (fs.existsSync(absolutePath)) fs.unlinkSync(absolutePath);
+    const sidecar = `${absolutePath}.meta.yaml`;
+    if (fs.existsSync(sidecar)) fs.unlinkSync(sidecar);
+    try {
+      deleteNoteAssetsDir(absolutePath);
+    } catch {
+      // Best effort; the note file is already removed.
+    }
+    throw error;
+  }
   return indexUpload(absolutePath);
 }
 

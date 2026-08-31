@@ -60,9 +60,53 @@ describe.sequential("document content actions", () => {
     await actions.updateDocumentContent(document!.id, "# Revised\n\nUpdated body.");
 
     expect(fs.readFileSync(sourcePath, "utf8")).toContain("Updated body.");
-    expect(queries.getDocumentByPath("uploads/pasted/note.md")?.summary).toContain(
-      "Revised",
+    expect(
+      queries.getDocumentByPath("uploads/pasted/note.md")?.summary,
+    ).toContain("Revised");
+  });
+
+  it("writes and prunes note images when updating pasted markdown", async () => {
+    const { actions, queries, scanner } = await loadTestModules();
+    const sourcePath = path.join(
+      process.env.LIBRARY_PATH!,
+      "uploads",
+      "pasted",
+      "note.md",
     );
+    const assetsDir = path.join(
+      process.env.LIBRARY_PATH!,
+      "uploads",
+      "pasted",
+      "note.assets",
+    );
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9, 0x00, 0x01]);
+    fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+    fs.mkdirSync(assetsDir, { recursive: true });
+    fs.writeFileSync(
+      sourcePath,
+      "First ![old](note-assets/old.jpg) ![keep](note-assets/keep.jpg)",
+    );
+    fs.writeFileSync(path.join(assetsDir, "old.jpg"), jpeg);
+    fs.writeFileSync(path.join(assetsDir, "keep.jpg"), jpeg);
+    writeSidecar(sourcePath, { title: "Illustrated", origin: "paste" });
+    await scanner.scanLibrary();
+
+    const document = queries.getDocumentByPath("uploads/pasted/note.md");
+    await actions.updateDocumentContent(
+      document!.id,
+      "Updated ![keep](note-assets/keep.jpg) ![fresh](note-assets/fresh.jpg)",
+      [{ filename: "fresh.jpg", data: jpeg }],
+    );
+
+    expect(fs.existsSync(path.join(assetsDir, "keep.jpg"))).toBe(true);
+    expect(fs.existsSync(path.join(assetsDir, "fresh.jpg"))).toBe(true);
+    expect(fs.existsSync(path.join(assetsDir, "old.jpg"))).toBe(false);
+    const html = fs.readFileSync(
+      queries.getDocumentByPath("uploads/pasted/note.md")!.articleHtmlPath!,
+      "utf8",
+    );
+    expect(html).toContain("fresh.jpg");
+    expect(html).not.toContain("old.jpg");
   });
 
   it("does not allow library Markdown files to be edited as notes", async () => {

@@ -44,7 +44,7 @@ export interface FormatAdapter {
 }
 
 export const ADAPTER_VERSIONS = {
-  markdown: "1.0.0",
+  markdown: "1.1.0",
   text: "1.0.0",
   docx: "1.0.0",
   pdf: "1.0.0",
