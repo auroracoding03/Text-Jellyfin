@@ -111,7 +111,7 @@ export async function prepareMixedPaste(
   let rewritten = "";
   let lastIndex = 0;
 
-  for (const match of html.matchAll(IMG_TAG_RE)) {
+  for (const match of Array.from(html.matchAll(IMG_TAG_RE))) {
     const full = match[0];
     const start = match.index ?? 0;
     const attrs = match[1] || "";
