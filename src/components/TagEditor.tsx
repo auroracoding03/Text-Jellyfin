@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { apiUrl } from "@/lib/client/api-url";
 
 function tagsFromValue(value: string): string[] {
   return value
@@ -29,7 +30,7 @@ export function TagEditor({
     setPending(true);
 
     try {
-      const response = await fetch(`/api/works/${id}/metadata`, {
+      const response = await fetch(apiUrl(`/api/works/${id}/metadata`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tags: tagsFromValue(value) }),

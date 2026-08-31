@@ -43,13 +43,11 @@ const NoteImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
-      "data-asset": {
+      asset: {
         default: null,
         parseHTML: (element) => element.getAttribute("data-asset"),
         renderHTML: (attributes) =>
-          attributes["data-asset"]
-            ? { "data-asset": attributes["data-asset"] }
-            : {},
+          attributes.asset ? { "data-asset": attributes.asset } : {},
       },
     };
   },
@@ -178,8 +176,21 @@ export function RichTextEditor({
     );
   }
 
-  function prunePending(markdown: string) {
+  function prunePending(markdown: string, editorHtml?: string) {
     const refs = new Set(listNoteAssetFilenames(markdown));
+    if (editorHtml && typeof window !== "undefined") {
+      const doc = new DOMParser().parseFromString(editorHtml, "text/html");
+      for (const img of Array.from(doc.querySelectorAll("img"))) {
+        const src = img.getAttribute("src") || "";
+        const fromAsset = parseNoteAssetFilename(img.getAttribute("data-asset") || "");
+        const fromSrc = parseNoteAssetFilename(src);
+        if (fromAsset) refs.add(fromAsset);
+        if (fromSrc) refs.add(fromSrc);
+        for (const [filename, entry] of Array.from(pendingRef.current.entries())) {
+          if (entry.blobUrl === src) refs.add(filename);
+        }
+      }
+    }
     let changed = false;
     for (const [filename, entry] of Array.from(pendingRef.current.entries())) {
       if (refs.has(filename)) continue;
@@ -232,8 +243,9 @@ export function RichTextEditor({
       },
     },
     onUpdate: ({ editor: current }) => {
-      const markdown = htmlToMarkdown(current.getHTML());
-      prunePending(markdown);
+      const html = current.getHTML();
+      const markdown = htmlToMarkdown(html);
+      prunePending(markdown, html);
       onChangeRef.current(markdown);
     },
   });
@@ -270,7 +282,7 @@ export function RichTextEditor({
           attrs: {
             src: blobUrl,
             alt: file.name.replace(/\.[^.]+$/, "") || "pasted image",
-            "data-asset": noteAssetMarkdownSrc(filename),
+            asset: noteAssetMarkdownSrc(filename),
           },
         }).run();
       } catch (error) {

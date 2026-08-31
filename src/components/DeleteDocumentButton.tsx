@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { apiUrl } from "@/lib/client/api-url";
 
 export function DeleteDocumentButton({
   id,
@@ -22,7 +23,7 @@ export function DeleteDocumentButton({
 
     setError(null);
     try {
-      const response = await fetch(`/api/works/${id}`, { method: "DELETE" });
+      const response = await fetch(apiUrl(`/api/works/${id}`), { method: "DELETE" });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
         throw new Error(payload.error || "Unable to delete this item.");

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { apiUrl } from "@/lib/client/api-url";
 
 export function MetadataForm({
   id,
@@ -27,7 +28,7 @@ export function MetadataForm({
     event.preventDefault();
     setError(null);
     try {
-      const response = await fetch(`/api/works/${id}/metadata`, {
+      const response = await fetch(apiUrl(`/api/works/${id}/metadata`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

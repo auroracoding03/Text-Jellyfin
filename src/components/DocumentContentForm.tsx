@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { PendingNoteImage } from "@/components/RichTextEditor";
+import { apiUrl } from "@/lib/client/api-url";
 
 const RichTextEditor = dynamic(
   () => import("@/components/RichTextEditor").then((mod) => mod.RichTextEditor),
@@ -46,7 +47,7 @@ export function DocumentContentForm({
       for (const image of pendingImages) {
         body.append("images", image.file, image.filename);
       }
-      const response = await fetch(`/api/works/${id}/content`, {
+      const response = await fetch(apiUrl(`/api/works/${id}/content`), {
         method: "PUT",
         body,
       });

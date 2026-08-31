@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { apiUrl } from "@/lib/client/api-url";
 
 export function RescanButton() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export function RescanButton() {
     setMessage(null);
     setError(null);
     try {
-      const response = await fetch("/api/scan", { method: "POST" });
+      const response = await fetch(apiUrl("/api/scan"), { method: "POST" });
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload.error || "Scan failed");

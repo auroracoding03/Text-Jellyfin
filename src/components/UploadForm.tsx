@@ -4,6 +4,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import type { PendingNoteImage } from "@/components/RichTextEditor";
+import { apiUrl } from "@/lib/client/api-url";
 
 const RichTextEditor = dynamic(
   () => import("@/components/RichTextEditor").then((mod) => mod.RichTextEditor),
@@ -97,7 +98,7 @@ export function UploadForm({
 
     setPending(true);
     try {
-      const response = await fetch("/api/uploads", {
+      const response = await fetch(apiUrl("/api/uploads"), {
         method: "POST",
         body,
         credentials: "same-origin",

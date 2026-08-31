@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/lib/client/api-url";
 
 type UpdateStatus = {
   status: string;
@@ -79,7 +80,7 @@ export function DesktopAppControls() {
         return;
       }
 
-      const response = await fetch("/api/server", { method: "DELETE" });
+      const response = await fetch(apiUrl("/api/server"), { method: "DELETE" });
       const body = (await response.json()) as { error?: string; message?: string };
       if (!response.ok) {
         throw new Error(body.error || "Unable to delete server data.");
